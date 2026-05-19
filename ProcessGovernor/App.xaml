@@ -1,0 +1,33 @@
+<Application x:Class="ProcessGovernor.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:converters="clr-namespace:ProcessGovernor.Converters"
+             xmlns:viewModels="clr-namespace:ProcessGovernor.ViewModels"
+             xmlns:views="clr-namespace:ProcessGovernor.Views">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="Styles/Theme.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+            <converters:SeverityBrushConverter x:Key="SeverityBrushConverter" />
+
+            <DataTemplate DataType="{x:Type viewModels:DashboardViewModel}">
+                <views:DashboardView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type viewModels:AutomationsViewModel}">
+                <views:AutomationsView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type viewModels:ProfilesViewModel}">
+                <views:ProfilesView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type viewModels:LogsViewModel}">
+                <views:LogsView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type viewModels:SettingsViewModel}">
+                <views:SettingsView />
+            </DataTemplate>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

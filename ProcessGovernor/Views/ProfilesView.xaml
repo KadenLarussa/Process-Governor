@@ -1,0 +1,53 @@
+<UserControl x:Class="ProcessGovernor.Views.ProfilesView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Margin="0,0,0,16">
+            <TextBlock Text="Profiles" Style="{StaticResource PageTitle}" />
+            <TextBlock Text="Group rules for gaming, work, streaming, benchmarking, and quiet operation." Style="{StaticResource MutedText}" />
+        </StackPanel>
+
+        <Border Grid.Row="1" Style="{StaticResource CardBorder}" Margin="0,0,0,14">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="150" />
+                    <ColumnDefinition Width="150" />
+                    <ColumnDefinition Width="150" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0">
+                    <TextBlock Text="Profile name" Foreground="{StaticResource MutedTextBrush}" />
+                    <TextBox Text="{Binding NewProfileName, UpdateSourceTrigger=PropertyChanged}" Margin="0,5,12,0" />
+                </StackPanel>
+                <Button Grid.Column="1" Content="Add Profile" Style="{StaticResource AccentButton}" Command="{Binding AddProfileCommand}" Margin="0,19,8,0" />
+                <Button Grid.Column="2" Content="Delete Selected" Command="{Binding DeleteProfileCommand}" Margin="0,19,8,0" />
+                <Button Grid.Column="3" Content="Save" Command="{Binding SaveCommand}" Margin="0,19,0,0" />
+            </Grid>
+        </Border>
+
+        <DataGrid Grid.Row="2"
+                  ItemsSource="{Binding Profiles}"
+                  SelectedItem="{Binding SelectedProfile}"
+                  AutoGenerateColumns="False"
+                  IsReadOnly="False"
+                  SelectionMode="Single">
+            <DataGrid.Columns>
+                <DataGridCheckBoxColumn Header="Enabled" Binding="{Binding Enabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="80" />
+                <DataGridTextColumn Header="Name" Binding="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="240" />
+                <DataGridTextColumn Header="Auto Process" Binding="{Binding AutoActivateProcessName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="220" />
+                <DataGridTextColumn Header="Order" Binding="{Binding PriorityOrder, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="100" />
+                <DataGridTextColumn Header="Rule Count" Binding="{Binding RuleIds.Count}" IsReadOnly="True" Width="120" />
+                <DataGridTextColumn Header="Id" Binding="{Binding Id}" IsReadOnly="True" Width="*" />
+            </DataGrid.Columns>
+        </DataGrid>
+    </Grid>
+</UserControl>
