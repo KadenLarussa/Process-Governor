@@ -82,6 +82,7 @@ public sealed class RulePersistenceService : IRulePersistenceService
         }, ref changed);
 
         RenameLegacyRule(store, LegacyFocusedRuleName, SafePcBoostRuleName, ref changed);
+        MergeLegacyProfile(store, "Focused Performance", "Safe PC Boost", ref changed);
 
         _ = EnsureRule(store, SafePcBoostRuleName, () => new AutomationRule
         {
@@ -174,6 +175,48 @@ public sealed class RulePersistenceService : IRulePersistenceService
         }
 
         legacyRule.Name = newName;
+        changed = true;
+    }
+
+    private static void MergeLegacyProfile(AutomationStoreFile store, string oldName, string newName, ref bool changed)
+    {
+        var legacyProfile = store.Profiles.FirstOrDefault(profile => profile.Name.Equals(oldName, StringComparison.OrdinalIgnoreCase));
+        if (legacyProfile is null)
+        {
+            return;
+        }
+
+        var newProfile = store.Profiles.FirstOrDefault(profile => profile.Name.Equals(newName, StringComparison.OrdinalIgnoreCase));
+        if (newProfile is null)
+        {
+            legacyProfile.Name = newName;
+            changed = true;
+            return;
+        }
+
+        foreach (var ruleId in legacyProfile.RuleIds)
+        {
+            if (!newProfile.RuleIds.Contains(ruleId, StringComparer.OrdinalIgnoreCase))
+            {
+                newProfile.RuleIds.Add(ruleId);
+            }
+        }
+
+        newProfile.Enabled |= legacyProfile.Enabled;
+        newProfile.IsActive |= legacyProfile.IsActive;
+        newProfile.PriorityOrder = Math.Min(newProfile.PriorityOrder, legacyProfile.PriorityOrder);
+        if (newProfile.TemporaryOverrideUntilUtc is null
+            || legacyProfile.TemporaryOverrideUntilUtc > newProfile.TemporaryOverrideUntilUtc)
+        {
+            newProfile.TemporaryOverrideUntilUtc = legacyProfile.TemporaryOverrideUntilUtc;
+        }
+
+        if (string.IsNullOrWhiteSpace(newProfile.AutoActivateProcessName))
+        {
+            newProfile.AutoActivateProcessName = legacyProfile.AutoActivateProcessName;
+        }
+
+        store.Profiles.Remove(legacyProfile);
         changed = true;
     }
 
