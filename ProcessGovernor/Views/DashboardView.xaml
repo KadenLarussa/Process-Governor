@@ -113,6 +113,24 @@
                                   Command="{Binding PlacementTarget.DataContext.SetHighPriorityCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                   CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
                     </MenuItem>
+                    <MenuItem Header="Set CPU Affinity">
+                        <MenuItem Header="All CPUs"
+                                  Command="{Binding PlacementTarget.DataContext.SetAllCpusAffinityCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                  CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                        <MenuItem Header="First Half"
+                                  Command="{Binding PlacementTarget.DataContext.SetFirstHalfAffinityCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                  CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                        <MenuItem Header="Second Half"
+                                  Command="{Binding PlacementTarget.DataContext.SetSecondHalfAffinityCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                  CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                    </MenuItem>
+                    <Separator />
+                    <MenuItem Header="Suspend Process"
+                              Command="{Binding PlacementTarget.DataContext.SuspendProcessCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                              CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                    <MenuItem Header="Resume Process"
+                              Command="{Binding PlacementTarget.DataContext.ResumeProcessCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                              CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
                 </ContextMenu>
             </DataGrid.ContextMenu>
             <DataGrid.Columns>
@@ -141,6 +159,7 @@
                 <DataGridTextColumn Header="Disk" Binding="{Binding DiskUsage}" Width="105" />
                 <DataGridTextColumn Header="GPU" Binding="{Binding GpuUsage}" Width="105" />
                 <DataGridTextColumn Header="Priority" Binding="{Binding PriorityDisplay}" Width="115" />
+                <DataGridTextColumn Header="Affinity" Binding="{Binding AffinityDisplay}" Width="110" />
                 <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="100" />
                 <DataGridTextColumn Header="Start Time" Binding="{Binding StartTimeDisplay}" Width="165" />
                 <DataGridTextColumn Header="Executable Path" Binding="{Binding ExecutablePathDisplay}" Width="*" />

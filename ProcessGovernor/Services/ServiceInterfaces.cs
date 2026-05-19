@@ -62,6 +62,14 @@ public interface IProcessActionService
 
     Task<ProcessPriorityClass?> GetPriorityAsync(int processId, CancellationToken cancellationToken);
 
+    Task<ProcessActionResult> SetCpuAffinityAsync(int processId, long affinityMask, CancellationToken cancellationToken);
+
+    Task<long?> GetCpuAffinityAsync(int processId, CancellationToken cancellationToken);
+
+    Task<ProcessActionResult> SuspendAsync(int processId, bool forceCriticalProcess, CancellationToken cancellationToken);
+
+    Task<ProcessActionResult> ResumeAsync(int processId, CancellationToken cancellationToken);
+
     Task<ProcessActionResult> OpenFileLocationAsync(string? executablePath, CancellationToken cancellationToken);
 
     Task<ProcessActionResult> CopyPathAsync(string? executablePath, CancellationToken cancellationToken);
@@ -95,6 +103,8 @@ public interface IAutomationEngine
 public interface IPowerPlanService
 {
     Task<string?> GetActivePlanAsync(CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<PowerPlanInfo>> GetAvailablePlansAsync(CancellationToken cancellationToken);
 
     Task<ProcessActionResult> SetActivePlanByNameAsync(string planName, CancellationToken cancellationToken);
 }

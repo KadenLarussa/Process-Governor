@@ -10,12 +10,19 @@ public sealed class AutomationsViewModel : ObservableObject
 {
     private readonly IRulePersistenceService _rulePersistenceService;
     private readonly IAutomationEngine _automationEngine;
+    private readonly IPowerPlanService _powerPlanService;
     private readonly IDialogService _dialogService;
     private AutomationStoreFile _store = new();
     private AutomationRuleViewModel? _selectedRule;
     private string _newRuleName = "New Process Rule";
     private string _newProcessName = string.Empty;
+    private AutomationTriggerType _newTriggerType = AutomationTriggerType.ProcessStarted;
+    private double _newThresholdValue = 80;
     private ProcessPriorityClass _newPriority = ProcessPriorityClass.High;
+    private bool _newAffinityEnabled;
+    private string _newAffinityMask = string.Empty;
+    private bool _newPowerPlanEnabled;
+    private string? _newPowerPlanName;
     private bool _newNotificationEnabled = true;
     private bool _newRevertOnExit = true;
     private bool _newDryRun;
@@ -25,10 +32,12 @@ public sealed class AutomationsViewModel : ObservableObject
     public AutomationsViewModel(
         IRulePersistenceService rulePersistenceService,
         IAutomationEngine automationEngine,
+        IPowerPlanService powerPlanService,
         IDialogService dialogService)
     {
         _rulePersistenceService = rulePersistenceService;
         _automationEngine = automationEngine;
+        _powerPlanService = powerPlanService;
         _dialogService = dialogService;
 
         AddRuleCommand = new AsyncRelayCommand(AddRuleAsync);
@@ -47,6 +56,16 @@ public sealed class AutomationsViewModel : ObservableObject
         ProcessPriorityClass.AboveNormal,
         ProcessPriorityClass.High
     ];
+
+    public IReadOnlyList<AutomationTriggerType> AvailableTriggerTypes { get; } =
+    [
+        AutomationTriggerType.ProcessStarted,
+        AutomationTriggerType.ProcessExited,
+        AutomationTriggerType.CpuThreshold,
+        AutomationTriggerType.MemoryThreshold
+    ];
+
+    public ObservableCollection<string> AvailablePowerPlans { get; } = [];
 
     public AsyncRelayCommand AddRuleCommand { get; }
 
@@ -80,10 +99,46 @@ public sealed class AutomationsViewModel : ObservableObject
         set => SetProperty(ref _newProcessName, value);
     }
 
+    public AutomationTriggerType NewTriggerType
+    {
+        get => _newTriggerType;
+        set => SetProperty(ref _newTriggerType, value);
+    }
+
+    public double NewThresholdValue
+    {
+        get => _newThresholdValue;
+        set => SetProperty(ref _newThresholdValue, Math.Clamp(value, 0, 1_000_000));
+    }
+
     public ProcessPriorityClass NewPriority
     {
         get => _newPriority;
         set => SetProperty(ref _newPriority, value);
+    }
+
+    public bool NewAffinityEnabled
+    {
+        get => _newAffinityEnabled;
+        set => SetProperty(ref _newAffinityEnabled, value);
+    }
+
+    public string NewAffinityMask
+    {
+        get => _newAffinityMask;
+        set => SetProperty(ref _newAffinityMask, value);
+    }
+
+    public bool NewPowerPlanEnabled
+    {
+        get => _newPowerPlanEnabled;
+        set => SetProperty(ref _newPowerPlanEnabled, value);
+    }
+
+    public string? NewPowerPlanName
+    {
+        get => _newPowerPlanName;
+        set => SetProperty(ref _newPowerPlanName, value);
     }
 
     public bool NewNotificationEnabled
@@ -119,6 +174,7 @@ public sealed class AutomationsViewModel : ObservableObject
     public async Task LoadAsync(CancellationToken cancellationToken = default)
     {
         _store = await _rulePersistenceService.LoadAsync(cancellationToken).ConfigureAwait(false);
+        var powerPlans = await _powerPlanService.GetAvailablePlansAsync(cancellationToken).ConfigureAwait(false);
         await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
         {
             Rules.Clear();
@@ -126,26 +182,39 @@ public sealed class AutomationsViewModel : ObservableObject
             {
                 Rules.Add(new AutomationRuleViewModel(rule));
             }
+
+            AvailablePowerPlans.Clear();
+            foreach (var plan in powerPlans)
+            {
+                AvailablePowerPlans.Add(plan.Name);
+            }
+
+            NewPowerPlanName ??= AvailablePowerPlans.FirstOrDefault();
         });
     }
 
     private async Task AddRuleAsync(CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(NewProcessName))
+        if (string.IsNullOrWhiteSpace(NewProcessName)
+            && NewTriggerType is AutomationTriggerType.ProcessStarted or AutomationTriggerType.ProcessExited)
         {
             _dialogService.ShowWarning("Automation Rule", "Enter the process name to watch, for example cs2.exe.");
             return;
         }
 
         var processName = NewProcessName.Trim();
+        var actionTargetName = string.IsNullOrWhiteSpace(processName) ? null : processName;
         var rule = new AutomationRule
         {
-            Name = string.IsNullOrWhiteSpace(NewRuleName) ? $"{processName} priority" : NewRuleName.Trim(),
+            Name = string.IsNullOrWhiteSpace(NewRuleName) ? $"{NewTriggerType} rule" : NewRuleName.Trim(),
             Enabled = true,
             Trigger = new AutomationTrigger
             {
-                Type = AutomationTriggerType.ProcessStarted,
-                ProcessName = processName
+                Type = NewTriggerType,
+                ProcessName = actionTargetName,
+                Threshold = NewTriggerType is AutomationTriggerType.CpuThreshold or AutomationTriggerType.MemoryThreshold
+                    ? NewThresholdValue
+                    : null
             },
             CooldownSeconds = NewCooldownSeconds,
             DelaySeconds = NewDelaySeconds,
@@ -156,11 +225,42 @@ public sealed class AutomationsViewModel : ObservableObject
                 new AutomationAction
                 {
                     Type = AutomationActionType.SetProcessPriority,
-                    TargetProcessName = processName,
+                    TargetProcessName = actionTargetName,
                     Priority = NewPriority
                 }
             ]
         };
+
+        if (NewAffinityEnabled)
+        {
+            if (!TryParseAffinityMask(NewAffinityMask, out var affinityMask))
+            {
+                _dialogService.ShowWarning("Automation Rule", "Enter CPU affinity as a decimal number or hex mask such as 0xFF.");
+                return;
+            }
+
+            rule.Actions.Add(new AutomationAction
+            {
+                Type = AutomationActionType.SetCpuAffinity,
+                TargetProcessName = actionTargetName,
+                CpuAffinityMask = affinityMask
+            });
+        }
+
+        if (NewPowerPlanEnabled)
+        {
+            if (string.IsNullOrWhiteSpace(NewPowerPlanName))
+            {
+                _dialogService.ShowWarning("Automation Rule", "Select a Windows power plan for the rule.");
+                return;
+            }
+
+            rule.Actions.Add(new AutomationAction
+            {
+                Type = AutomationActionType.ChangePowerPlan,
+                PowerPlanName = NewPowerPlanName
+            });
+        }
 
         if (NewNotificationEnabled)
         {
@@ -168,7 +268,9 @@ public sealed class AutomationsViewModel : ObservableObject
             {
                 Type = AutomationActionType.SendNotification,
                 NotificationTitle = "Automation triggered",
-                NotificationMessage = $"{processName} detected. Priority set to {NewPriority}."
+                NotificationMessage = string.IsNullOrWhiteSpace(processName)
+                    ? $"{NewTriggerType} threshold met. Priority set to {NewPriority}."
+                    : $"{processName} detected. Priority set to {NewPriority}."
             });
         }
 
@@ -176,6 +278,24 @@ public sealed class AutomationsViewModel : ObservableObject
         Rules.Add(new AutomationRuleViewModel(rule));
         await SaveAsync(cancellationToken).ConfigureAwait(false);
         NewProcessName = string.Empty;
+    }
+
+    private static bool TryParseAffinityMask(string value, out long affinityMask)
+    {
+        affinityMask = 0;
+        var trimmed = value.Trim();
+        if (string.IsNullOrWhiteSpace(trimmed))
+        {
+            return false;
+        }
+
+        if (trimmed.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+        {
+            return long.TryParse(trimmed[2..], System.Globalization.NumberStyles.HexNumber, null, out affinityMask)
+                && affinityMask > 0;
+        }
+
+        return long.TryParse(trimmed, out affinityMask) && affinityMask > 0;
     }
 
     private async Task DeleteRuleAsync(CancellationToken cancellationToken)

@@ -10,8 +10,10 @@ public sealed class ProcessRowViewModel : ObservableObject
     private double _cpuUsagePercent;
     private long _workingSetBytes;
     private string _diskUsage = "Unavailable";
+    private double? _diskBytesPerSecond;
     private string _gpuUsage = "Unavailable";
     private ProcessPriorityClass? _priority;
+    private long? _cpuAffinityMask;
     private string _status = "Running";
     private DateTimeOffset? _startTime;
     private string? _executablePath;
@@ -62,6 +64,12 @@ public sealed class ProcessRowViewModel : ObservableObject
         private set => SetProperty(ref _diskUsage, value);
     }
 
+    public double? DiskBytesPerSecond
+    {
+        get => _diskBytesPerSecond;
+        private set => SetProperty(ref _diskBytesPerSecond, value);
+    }
+
     public string GpuUsage
     {
         get => _gpuUsage;
@@ -76,6 +84,18 @@ public sealed class ProcessRowViewModel : ObservableObject
             if (SetProperty(ref _priority, value))
             {
                 OnPropertyChanged(nameof(PriorityDisplay));
+            }
+        }
+    }
+
+    public long? CpuAffinityMask
+    {
+        get => _cpuAffinityMask;
+        private set
+        {
+            if (SetProperty(ref _cpuAffinityMask, value))
+            {
+                OnPropertyChanged(nameof(AffinityDisplay));
             }
         }
     }
@@ -128,6 +148,8 @@ public sealed class ProcessRowViewModel : ObservableObject
 
     public string PriorityDisplay => Priority?.ToString() ?? "Unavailable";
 
+    public string AffinityDisplay => CpuAffinityMask is null ? "Unavailable" : $"0x{CpuAffinityMask.Value:X}";
+
     public string StartTimeDisplay => StartTime?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss") ?? "Unavailable";
 
     public string ExecutablePathDisplay => string.IsNullOrWhiteSpace(ExecutablePath) ? "Unavailable" : ExecutablePath;
@@ -138,8 +160,10 @@ public sealed class ProcessRowViewModel : ObservableObject
         CpuUsagePercent = snapshot.CpuUsagePercent;
         WorkingSetBytes = snapshot.WorkingSetBytes;
         DiskUsage = snapshot.DiskUsage;
+        DiskBytesPerSecond = snapshot.DiskBytesPerSecond;
         GpuUsage = snapshot.GpuUsage;
         Priority = snapshot.Priority;
+        CpuAffinityMask = snapshot.CpuAffinityMask;
         Status = snapshot.Status;
         StartTime = snapshot.StartTime;
         ExecutablePath = snapshot.ExecutablePath;

@@ -22,8 +22,8 @@
                     <ColumnDefinition Width="1.2*" />
                     <ColumnDefinition Width="1.1*" />
                     <ColumnDefinition Width="180" />
-                    <ColumnDefinition Width="120" />
-                    <ColumnDefinition Width="120" />
+                    <ColumnDefinition Width="140" />
+                    <ColumnDefinition Width="160" />
                     <ColumnDefinition Width="170" />
                 </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
@@ -34,22 +34,30 @@
 
                 <TextBlock Grid.Row="0" Grid.Column="0" Text="Rule name" Foreground="{StaticResource MutedTextBrush}" />
                 <TextBlock Grid.Row="0" Grid.Column="1" Text="Process name" Foreground="{StaticResource MutedTextBrush}" />
-                <TextBlock Grid.Row="0" Grid.Column="2" Text="Priority" Foreground="{StaticResource MutedTextBrush}" />
-                <TextBlock Grid.Row="0" Grid.Column="3" Text="Cooldown" Foreground="{StaticResource MutedTextBrush}" />
-                <TextBlock Grid.Row="0" Grid.Column="4" Text="Delay" Foreground="{StaticResource MutedTextBrush}" />
+                <TextBlock Grid.Row="0" Grid.Column="2" Text="Trigger" Foreground="{StaticResource MutedTextBrush}" />
+                <TextBlock Grid.Row="0" Grid.Column="3" Text="Threshold" Foreground="{StaticResource MutedTextBrush}" />
+                <TextBlock Grid.Row="0" Grid.Column="4" Text="Priority" Foreground="{StaticResource MutedTextBrush}" />
 
                 <TextBox Grid.Row="1" Grid.Column="0" Text="{Binding NewRuleName, UpdateSourceTrigger=PropertyChanged}" Margin="0,5,10,0" />
                 <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding NewProcessName, UpdateSourceTrigger=PropertyChanged}" Margin="0,5,10,0" />
-                <ComboBox Grid.Row="1" Grid.Column="2" ItemsSource="{Binding AvailablePriorities}" SelectedItem="{Binding NewPriority}" Margin="0,5,10,0" />
-                <TextBox Grid.Row="1" Grid.Column="3" Text="{Binding NewCooldownSeconds, UpdateSourceTrigger=PropertyChanged}" Margin="0,5,10,0" />
-                <TextBox Grid.Row="1" Grid.Column="4" Text="{Binding NewDelaySeconds, UpdateSourceTrigger=PropertyChanged}" Margin="0,5,10,0" />
+                <ComboBox Grid.Row="1" Grid.Column="2" ItemsSource="{Binding AvailableTriggerTypes}" SelectedItem="{Binding NewTriggerType}" Margin="0,5,10,0" />
+                <TextBox Grid.Row="1" Grid.Column="3" Text="{Binding NewThresholdValue, UpdateSourceTrigger=PropertyChanged}" Margin="0,5,10,0" ToolTip="CPU threshold is percent. RAM threshold is MB." />
+                <ComboBox Grid.Row="1" Grid.Column="4" ItemsSource="{Binding AvailablePriorities}" SelectedItem="{Binding NewPriority}" Margin="0,5,10,0" />
                 <Button Grid.Row="1" Grid.Column="5" Content="Add Rule" Style="{StaticResource AccentButton}" Command="{Binding AddRuleCommand}" Margin="0,5,0,0" />
 
-                <StackPanel Grid.Row="2" Grid.ColumnSpan="6" Orientation="Horizontal" Margin="0,10,0,0">
+                <WrapPanel Grid.Row="2" Grid.ColumnSpan="6" Margin="0,10,0,0">
                     <CheckBox Content="Send notification" IsChecked="{Binding NewNotificationEnabled}" />
                     <CheckBox Content="Revert on exit" IsChecked="{Binding NewRevertOnExit}" />
                     <CheckBox Content="Dry run" IsChecked="{Binding NewDryRun}" />
-                </StackPanel>
+                    <TextBlock Text="Cooldown" Foreground="{StaticResource MutedTextBrush}" VerticalAlignment="Center" Margin="10,0,6,0" />
+                    <TextBox Text="{Binding NewCooldownSeconds, UpdateSourceTrigger=PropertyChanged}" Width="70" Margin="0,0,10,0" />
+                    <TextBlock Text="Delay" Foreground="{StaticResource MutedTextBrush}" VerticalAlignment="Center" Margin="0,0,6,0" />
+                    <TextBox Text="{Binding NewDelaySeconds, UpdateSourceTrigger=PropertyChanged}" Width="70" Margin="0,0,10,0" />
+                    <CheckBox Content="Set affinity" IsChecked="{Binding NewAffinityEnabled}" />
+                    <TextBox Text="{Binding NewAffinityMask, UpdateSourceTrigger=PropertyChanged}" Width="95" Margin="0,0,10,0" ToolTip="Decimal or hex mask, for example 0xFF." />
+                    <CheckBox Content="Power plan" IsChecked="{Binding NewPowerPlanEnabled}" />
+                    <ComboBox ItemsSource="{Binding AvailablePowerPlans}" SelectedItem="{Binding NewPowerPlanName}" Width="210" />
+                </WrapPanel>
             </Grid>
         </Border>
 

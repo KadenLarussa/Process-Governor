@@ -95,6 +95,137 @@ public sealed class ProcessActionService : IProcessActionService
         }
     }
 
+    public async Task<ProcessActionResult> SetCpuAffinityAsync(int processId, long affinityMask, CancellationToken cancellationToken)
+    {
+        if (affinityMask <= 0)
+        {
+            return ProcessActionResult.Failure("CPU affinity mask must include at least one CPU.");
+        }
+
+        try
+        {
+            using var process = Process.GetProcessById(processId);
+            var oldAffinity = process.ProcessorAffinity.ToInt64();
+            process.ProcessorAffinity = new IntPtr(affinityMask);
+            var message = $"Changed CPU affinity for {process.ProcessName} ({processId}) from 0x{oldAffinity:X} to 0x{affinityMask:X}.";
+            await _loggingService.LogAsync(LogSeverity.Information, nameof(ProcessActionService), message, processId: processId, cancellationToken: cancellationToken).ConfigureAwait(false);
+            return ProcessActionResult.Success(message);
+        }
+        catch (ArgumentException ex)
+        {
+            return ProcessActionResult.Failure("The process no longer exists.", ex);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return ProcessActionResult.Failure("Access denied. Try running Process Governor as administrator.", ex);
+        }
+        catch (System.ComponentModel.Win32Exception ex)
+        {
+            return ProcessActionResult.Failure($"Windows refused the operation: {ex.Message}", ex);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return ProcessActionResult.Failure("The process exited before the action completed.", ex);
+        }
+    }
+
+    public Task<long?> GetCpuAffinityAsync(int processId, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        try
+        {
+            using var process = Process.GetProcessById(processId);
+            return Task.FromResult<long?>(process.ProcessorAffinity.ToInt64());
+        }
+        catch
+        {
+            return Task.FromResult<long?>(null);
+        }
+    }
+
+    public async Task<ProcessActionResult> SuspendAsync(int processId, bool forceCriticalProcess, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        try
+        {
+            using var process = Process.GetProcessById(processId);
+            if (!forceCriticalProcess && IsCriticalProcessName(process.ProcessName))
+            {
+                return ProcessActionResult.Failure($"{process.ProcessName} is a protected or critical Windows process.");
+            }
+
+            var handle = Core.NativeMethods.OpenProcess(Core.NativeMethods.ProcessSuspendResume, false, processId);
+            if (handle == IntPtr.Zero || handle == new IntPtr(-1))
+            {
+                return ProcessActionResult.Failure("Unable to open the process for suspend. Try running as administrator.");
+            }
+
+            try
+            {
+                var status = Core.NativeMethods.NtSuspendProcess(handle);
+                if (status != 0)
+                {
+                    return ProcessActionResult.Failure($"Windows refused suspend with NTSTATUS 0x{status:X8}.");
+                }
+            }
+            finally
+            {
+                Core.NativeMethods.CloseHandle(handle);
+            }
+
+            var message = $"Suspended {process.ProcessName} ({processId}).";
+            await _loggingService.LogAsync(LogSeverity.Warning, nameof(ProcessActionService), message, processId: processId, cancellationToken: cancellationToken).ConfigureAwait(false);
+            return ProcessActionResult.Success(message);
+        }
+        catch (ArgumentException ex)
+        {
+            return ProcessActionResult.Failure("The process no longer exists.", ex);
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or System.ComponentModel.Win32Exception or InvalidOperationException)
+        {
+            return ProcessActionResult.Failure($"Suspend failed: {ex.Message}", ex);
+        }
+    }
+
+    public async Task<ProcessActionResult> ResumeAsync(int processId, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        try
+        {
+            using var process = Process.GetProcessById(processId);
+            var handle = Core.NativeMethods.OpenProcess(Core.NativeMethods.ProcessSuspendResume, false, processId);
+            if (handle == IntPtr.Zero || handle == new IntPtr(-1))
+            {
+                return ProcessActionResult.Failure("Unable to open the process for resume. Try running as administrator.");
+            }
+
+            try
+            {
+                var status = Core.NativeMethods.NtResumeProcess(handle);
+                if (status != 0)
+                {
+                    return ProcessActionResult.Failure($"Windows refused resume with NTSTATUS 0x{status:X8}.");
+                }
+            }
+            finally
+            {
+                Core.NativeMethods.CloseHandle(handle);
+            }
+
+            var message = $"Resumed {process.ProcessName} ({processId}).";
+            await _loggingService.LogAsync(LogSeverity.Information, nameof(ProcessActionService), message, processId: processId, cancellationToken: cancellationToken).ConfigureAwait(false);
+            return ProcessActionResult.Success(message);
+        }
+        catch (ArgumentException ex)
+        {
+            return ProcessActionResult.Failure("The process no longer exists.", ex);
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or System.ComponentModel.Win32Exception or InvalidOperationException)
+        {
+            return ProcessActionResult.Failure($"Resume failed: {ex.Message}", ex);
+        }
+    }
+
     public async Task<ProcessActionResult> OpenFileLocationAsync(string? executablePath, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();

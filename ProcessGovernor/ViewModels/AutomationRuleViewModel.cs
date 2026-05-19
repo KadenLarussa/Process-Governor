@@ -80,6 +80,8 @@ public sealed class AutomationRuleViewModel : ObservableObject
     {
         AutomationTriggerType.ProcessStarted => $"When {_model.Trigger.ProcessName} starts",
         AutomationTriggerType.ProcessExited => $"When {_model.Trigger.ProcessName} exits",
+        AutomationTriggerType.CpuThreshold => $"CPU >= {_model.Trigger.Threshold:0.#}% for {_model.Trigger.ProcessName ?? "any process"}",
+        AutomationTriggerType.MemoryThreshold => $"RAM >= {_model.Trigger.Threshold:0.#} MB for {_model.Trigger.ProcessName ?? "any process"}",
         _ => _model.Trigger.Type.ToString()
     };
 
@@ -95,6 +97,10 @@ public sealed class AutomationRuleViewModel : ObservableObject
             return string.Join(", ", _model.Actions.Select(action => action.Type switch
             {
                 AutomationActionType.SetProcessPriority => $"Set priority {action.Priority}",
+                AutomationActionType.SetCpuAffinity => $"Set affinity 0x{action.CpuAffinityMask:X}",
+                AutomationActionType.ChangePowerPlan => $"Power plan {action.PowerPlanName}",
+                AutomationActionType.SuspendProcess => $"Suspend {action.TargetProcessName}",
+                AutomationActionType.ResumeProcess => $"Resume {action.TargetProcessName}",
                 AutomationActionType.SendNotification => "Notify",
                 _ => action.Type.ToString()
             }));

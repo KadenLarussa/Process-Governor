@@ -12,6 +12,8 @@ public sealed class SystemSummary
 
     public string DiskActivity { get; init; } = "Unavailable";
 
+    public double? DiskBytesPerSecond { get; init; }
+
     public string GpuUsage { get; init; } = "Unavailable";
 
     public int ProcessCount { get; init; }
