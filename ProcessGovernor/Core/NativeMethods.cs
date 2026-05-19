@@ -29,9 +29,15 @@ internal static class NativeMethods
     [DllImport("ntdll.dll")]
     internal static extern int NtResumeProcess(IntPtr processHandle);
 
+    // Enables a dark native title bar on supported Windows 10/11 builds.
+    [DllImport("dwmapi.dll")]
+    internal static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int attributeValue, int attributeSize);
+
     internal const uint ProcessQueryLimitedInformation = 0x1000;
     internal const uint ProcessSetInformation = 0x0200;
     internal const uint ProcessSuspendResume = 0x0800;
+    internal const int DwmWindowAttributeUseImmersiveDarkMode = 20;
+    internal const int DwmWindowAttributeUseImmersiveDarkModeBefore20H1 = 19;
 
     [StructLayout(LayoutKind.Sequential)]
     internal struct FileTime

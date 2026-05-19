@@ -55,8 +55,16 @@
                   IsReadOnly="False"
                   SelectionMode="Single">
             <DataGrid.Columns>
-                <DataGridCheckBoxColumn Header="Enabled" Binding="{Binding Enabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="80" />
-                <DataGridCheckBoxColumn Header="Active" Binding="{Binding IsActive, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="70" />
+                <DataGridCheckBoxColumn Header="Enabled"
+                                        Binding="{Binding Enabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                        ElementStyle="{StaticResource GridCheckBoxStyle}"
+                                        EditingElementStyle="{StaticResource GridCheckBoxStyle}"
+                                        Width="80" />
+                <DataGridCheckBoxColumn Header="Active"
+                                        Binding="{Binding IsActive, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                        ElementStyle="{StaticResource GridCheckBoxStyle}"
+                                        EditingElementStyle="{StaticResource GridCheckBoxStyle}"
+                                        Width="70" />
                 <DataGridTextColumn Header="Name" Binding="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="240" />
                 <DataGridTextColumn Header="Auto Process" Binding="{Binding AutoActivateProcessName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="220" />
                 <DataGridTextColumn Header="Order" Binding="{Binding PriorityOrder, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="100" />

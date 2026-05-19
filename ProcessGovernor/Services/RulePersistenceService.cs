@@ -6,6 +6,8 @@ namespace ProcessGovernor.Services;
 
 public sealed class RulePersistenceService : IRulePersistenceService
 {
+    private const string SafePcBoostRuleName = "Safe PC Boost: busy app helper";
+    private const string LegacyFocusedRuleName = "Focused Performance: high-load app boost";
     private readonly AppPaths _paths;
     private readonly IJsonFileStore _store;
 
@@ -79,9 +81,11 @@ public sealed class RulePersistenceService : IRulePersistenceService
             ]
         }, ref changed);
 
-        _ = EnsureRule(store, "Focused Performance: high-load app boost", () => new AutomationRule
+        RenameLegacyRule(store, LegacyFocusedRuleName, SafePcBoostRuleName, ref changed);
+
+        _ = EnsureRule(store, SafePcBoostRuleName, () => new AutomationRule
         {
-            Name = "Focused Performance: high-load app boost",
+            Name = SafePcBoostRuleName,
             Enabled = true,
             Trigger = new AutomationTrigger
             {
@@ -106,14 +110,14 @@ public sealed class RulePersistenceService : IRulePersistenceService
                 new AutomationAction
                 {
                     Type = AutomationActionType.SendNotification,
-                    NotificationTitle = "Focused Performance",
+                    NotificationTitle = "Safe PC Boost",
                     NotificationMessage = "A high-load process was detected and given a temporary priority boost."
                 }
             ]
         }, ref changed);
 
-        var focusedRule = store.Rules.First(static rule => rule.Name.Equals("Focused Performance: high-load app boost", StringComparison.OrdinalIgnoreCase));
-        EnsureProfile(store, "Focused Performance", 5, null, [focusedRule.Id], ref changed);
+        var focusedRule = store.Rules.First(static rule => rule.Name.Equals(SafePcBoostRuleName, StringComparison.OrdinalIgnoreCase));
+        EnsureProfile(store, "Safe PC Boost", 5, null, [focusedRule.Id], ref changed);
         EnsureProfile(store, "Gaming", 10, "cs2.exe", [cs2Rule.Id], ref changed);
         EnsureProfile(store, "Work", 20, null, [], ref changed);
         EnsureProfile(store, "Quiet Mode", 30, null, [], ref changed);
@@ -154,6 +158,23 @@ public sealed class RulePersistenceService : IRulePersistenceService
         store.Rules.Add(rule);
         changed = true;
         return rule;
+    }
+
+    private static void RenameLegacyRule(AutomationStoreFile store, string oldName, string newName, ref bool changed)
+    {
+        if (store.Rules.Any(rule => rule.Name.Equals(newName, StringComparison.OrdinalIgnoreCase)))
+        {
+            return;
+        }
+
+        var legacyRule = store.Rules.FirstOrDefault(rule => rule.Name.Equals(oldName, StringComparison.OrdinalIgnoreCase));
+        if (legacyRule is null)
+        {
+            return;
+        }
+
+        legacyRule.Name = newName;
+        changed = true;
     }
 
     private static AutomationProfile EnsureProfile(

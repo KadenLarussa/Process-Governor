@@ -1,5 +1,7 @@
 using System.ComponentModel;
 using System.Windows;
+using System.Windows.Interop;
+using ProcessGovernor.Core;
 using ProcessGovernor.Services;
 
 namespace ProcessGovernor;
@@ -18,6 +20,12 @@ public partial class MainWindow : Window
     }
 
     public void AllowExit() => _allowExit = true;
+
+    protected override void OnSourceInitialized(EventArgs e)
+    {
+        base.OnSourceInitialized(e);
+        TryEnableDarkTitleBar();
+    }
 
     protected override void OnStateChanged(EventArgs e)
     {
@@ -42,5 +50,31 @@ public partial class MainWindow : Window
         }
 
         base.OnClosing(e);
+    }
+
+    private void TryEnableDarkTitleBar()
+    {
+        var hwnd = new WindowInteropHelper(this).Handle;
+        if (hwnd == IntPtr.Zero)
+        {
+            return;
+        }
+
+        var enabled = 1;
+        var size = sizeof(int);
+        var result = NativeMethods.DwmSetWindowAttribute(
+            hwnd,
+            NativeMethods.DwmWindowAttributeUseImmersiveDarkMode,
+            ref enabled,
+            size);
+
+        if (result != 0)
+        {
+            _ = NativeMethods.DwmSetWindowAttribute(
+                hwnd,
+                NativeMethods.DwmWindowAttributeUseImmersiveDarkModeBefore20H1,
+                ref enabled,
+                size);
+        }
     }
 }

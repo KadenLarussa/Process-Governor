@@ -26,9 +26,9 @@ Phase 2 and 3 are intentionally not faked. Models and service boundaries are rea
 
 Phase 2 branch work adds:
 
-- Higher contrast dark theme resources for readable dropdowns, grids, buttons, and editable cells.
-- A presets-first automation builder for game launch boosts, focused performance, and quiet background apps.
-- A default `Focused Performance` PC optimization profile that stays dormant until activated.
+- Higher contrast dark theme resources for readable dropdowns, grids, buttons, editable cells, checkboxes, tooltips, scrollbars, and native dark title bars.
+- A presets-first automation builder with beginner-friendly labels for game launch boosts, safe PC boosts, and quiet background apps.
+- A default `Safe PC Boost` PC optimization profile that stays dormant until activated.
 - CPU affinity display and dashboard presets for all CPUs, first half, and second half.
 - Suspend and resume process actions using native Windows process handles.
 - Per-process and summary disk I/O rates from native process I/O counters when Windows grants access.

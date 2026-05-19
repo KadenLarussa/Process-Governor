@@ -8,6 +8,10 @@ namespace ProcessGovernor.ViewModels;
 
 public sealed class AutomationsViewModel : ObservableObject
 {
+    private const string SafePcBoostRuleName = "Safe PC Boost: busy app helper";
+    private const string SafePcBoostProfileName = "Safe PC Boost";
+    private const string LegacyFocusedRuleName = "Focused Performance: high-load app boost";
+    private const string LegacyFocusedProfileName = "Focused Performance";
     private readonly IRulePersistenceService _rulePersistenceService;
     private readonly IAutomationEngine _automationEngine;
     private readonly IPowerPlanService _powerPlanService;
@@ -28,7 +32,7 @@ public sealed class AutomationsViewModel : ObservableObject
     private bool _newDryRun;
     private int _newCooldownSeconds = 30;
     private int _newDelaySeconds;
-    private string _presetStatus = "Presets are reversible and logged. Profile presets only run when the profile is active.";
+    private string _presetStatus = "Safe presets are reversible, logged, and only run when their profile is active.";
 
     public AutomationsViewModel(
         IRulePersistenceService rulePersistenceService,
@@ -53,21 +57,21 @@ public sealed class AutomationsViewModel : ObservableObject
 
     public ObservableCollection<AutomationRuleViewModel> Rules { get; } = [];
 
-    public IReadOnlyList<ProcessPriorityClass> AvailablePriorities { get; } =
+    public IReadOnlyList<OptionItem<ProcessPriorityClass>> AvailablePriorities { get; } =
     [
-        ProcessPriorityClass.Idle,
-        ProcessPriorityClass.BelowNormal,
-        ProcessPriorityClass.Normal,
-        ProcessPriorityClass.AboveNormal,
-        ProcessPriorityClass.High
+        new(ProcessPriorityClass.Idle, "Very low background", "Use for apps that can wait."),
+        new(ProcessPriorityClass.BelowNormal, "Lower background", "Keeps helper apps from competing."),
+        new(ProcessPriorityClass.Normal, "Normal", "Windows default priority."),
+        new(ProcessPriorityClass.AboveNormal, "Small performance boost", "Safer boost for busy apps."),
+        new(ProcessPriorityClass.High, "High performance", "Use only for trusted games or tools.")
     ];
 
-    public IReadOnlyList<AutomationTriggerType> AvailableTriggerTypes { get; } =
+    public IReadOnlyList<OptionItem<AutomationTriggerType>> AvailableTriggerTypes { get; } =
     [
-        AutomationTriggerType.ProcessStarted,
-        AutomationTriggerType.ProcessExited,
-        AutomationTriggerType.CpuThreshold,
-        AutomationTriggerType.MemoryThreshold
+        new(AutomationTriggerType.ProcessStarted, "App opens", "Run the rule when a specific .exe starts."),
+        new(AutomationTriggerType.ProcessExited, "App closes", "Run the rule when a specific .exe exits."),
+        new(AutomationTriggerType.CpuThreshold, "CPU gets busy", "Run when an app crosses a CPU percentage."),
+        new(AutomationTriggerType.MemoryThreshold, "RAM gets high", "Run when an app crosses a RAM amount.")
     ];
 
     public ObservableCollection<string> AvailablePowerPlans { get; } = [];
@@ -115,7 +119,13 @@ public sealed class AutomationsViewModel : ObservableObject
     public AutomationTriggerType NewTriggerType
     {
         get => _newTriggerType;
-        set => SetProperty(ref _newTriggerType, value);
+        set
+        {
+            if (SetProperty(ref _newTriggerType, value))
+            {
+                OnPropertyChanged(nameof(NewTriggerHelp));
+            }
+        }
     }
 
     public double NewThresholdValue
@@ -127,7 +137,13 @@ public sealed class AutomationsViewModel : ObservableObject
     public ProcessPriorityClass NewPriority
     {
         get => _newPriority;
-        set => SetProperty(ref _newPriority, value);
+        set
+        {
+            if (SetProperty(ref _newPriority, value))
+            {
+                OnPropertyChanged(nameof(NewPriorityHelp));
+            }
+        }
     }
 
     public bool NewAffinityEnabled
@@ -190,6 +206,25 @@ public sealed class AutomationsViewModel : ObservableObject
         set => SetProperty(ref _presetStatus, value);
     }
 
+    public string NewTriggerHelp => NewTriggerType switch
+    {
+        AutomationTriggerType.ProcessStarted => "Best for games and apps. Type the executable name, for example cs2.exe.",
+        AutomationTriggerType.ProcessExited => "Useful for cleanup rules after an app closes.",
+        AutomationTriggerType.CpuThreshold => "Watches CPU load and boosts the matching app only after it gets busy.",
+        AutomationTriggerType.MemoryThreshold => "Watches RAM usage. Threshold is entered in MB.",
+        _ => "Choose what should wake this rule up."
+    };
+
+    public string NewPriorityHelp => NewPriority switch
+    {
+        ProcessPriorityClass.Idle => "Lowest priority. Good for background helpers you do not care about.",
+        ProcessPriorityClass.BelowNormal => "A gentle way to make a background app less competitive.",
+        ProcessPriorityClass.Normal => "Leaves the app at Windows default priority.",
+        ProcessPriorityClass.AboveNormal => "Recommended boost. Noticeable without being extreme.",
+        ProcessPriorityClass.High => "Stronger boost for trusted foreground apps. Avoid using it for random background apps.",
+        _ => "Pick how strongly Windows should favor the app."
+    };
+
     public async Task LoadAsync(CancellationToken cancellationToken = default)
     {
         _store = await _rulePersistenceService.LoadAsync(cancellationToken).ConfigureAwait(false);
@@ -228,12 +263,12 @@ public sealed class AutomationsViewModel : ObservableObject
         NewDryRun = false;
         NewCooldownSeconds = 30;
         NewDelaySeconds = 1;
-        PresetStatus = "Game Launch Boost is ready. Replace game.exe with the executable you want to optimize.";
+        PresetStatus = "Game Launch Boost is ready. Replace game.exe with your game, then add and save the rule.";
     }
 
     private void UseFocusedPerformancePreset()
     {
-        NewRuleName = "Focused Performance: high-load app boost";
+        NewRuleName = SafePcBoostRuleName;
         NewProcessName = string.Empty;
         NewTriggerType = AutomationTriggerType.CpuThreshold;
         NewThresholdValue = 55;
@@ -247,7 +282,7 @@ public sealed class AutomationsViewModel : ObservableObject
         NewDryRun = false;
         NewCooldownSeconds = 180;
         NewDelaySeconds = 0;
-        PresetStatus = "Focused Performance boosts whichever process crosses the CPU threshold.";
+        PresetStatus = "Safe PC Boost is ready. It gives busy apps a small, logged boost and rolls back when possible.";
     }
 
     private void UseQuietBackgroundPreset()
@@ -265,28 +300,40 @@ public sealed class AutomationsViewModel : ObservableObject
         NewDryRun = false;
         NewCooldownSeconds = 60;
         NewDelaySeconds = 0;
-        PresetStatus = "Quiet Background App is ready. Replace discord.exe with a helper app you want to de-prioritize.";
+        PresetStatus = "Quiet Background is ready. Replace discord.exe with an app you want to make less pushy.";
     }
 
     private async Task AddFocusedPerformanceProfileAsync(CancellationToken cancellationToken)
     {
-        var rule = _store.Rules.FirstOrDefault(static rule => rule.Name.Equals("Focused Performance: high-load app boost", StringComparison.OrdinalIgnoreCase));
+        var rule = _store.Rules.FirstOrDefault(static rule =>
+            rule.Name.Equals(SafePcBoostRuleName, StringComparison.OrdinalIgnoreCase)
+            || rule.Name.Equals(LegacyFocusedRuleName, StringComparison.OrdinalIgnoreCase));
         if (rule is null)
         {
             rule = CreateFocusedPerformanceRule(GetPreferredPowerPlanName() ?? "High performance");
             _store.Rules.Add(rule);
         }
+        else if (rule.Name.Equals(LegacyFocusedRuleName, StringComparison.OrdinalIgnoreCase))
+        {
+            rule.Name = SafePcBoostRuleName;
+        }
 
-        var profile = _store.Profiles.FirstOrDefault(static profile => profile.Name.Equals("Focused Performance", StringComparison.OrdinalIgnoreCase));
+        var profile = _store.Profiles.FirstOrDefault(static profile => profile.Name.Equals(SafePcBoostProfileName, StringComparison.OrdinalIgnoreCase))
+            ?? _store.Profiles.FirstOrDefault(static profile => profile.Name.Equals(LegacyFocusedProfileName, StringComparison.OrdinalIgnoreCase));
         if (profile is null)
         {
             profile = new AutomationProfile
             {
-                Name = "Focused Performance",
+                Name = SafePcBoostProfileName,
                 PriorityOrder = 5,
                 Enabled = true
             };
             _store.Profiles.Add(profile);
+        }
+        else if (profile.Name.Equals(LegacyFocusedProfileName, StringComparison.OrdinalIgnoreCase)
+            && !_store.Profiles.Any(static item => item.Name.Equals(SafePcBoostProfileName, StringComparison.OrdinalIgnoreCase)))
+        {
+            profile.Name = SafePcBoostProfileName;
         }
 
         if (!profile.RuleIds.Contains(rule.Id, StringComparer.OrdinalIgnoreCase))
@@ -297,7 +344,7 @@ public sealed class AutomationsViewModel : ObservableObject
         await _rulePersistenceService.SaveAsync(_store, cancellationToken).ConfigureAwait(false);
         await _automationEngine.ReloadRulesAsync(cancellationToken).ConfigureAwait(false);
         await LoadAsync(cancellationToken).ConfigureAwait(false);
-        PresetStatus = "Focused Performance profile is installed. Activate it from Profiles when you want the rule armed.";
+        PresetStatus = "Safe PC Boost profile is installed. Activate it from Profiles when you want the boost armed.";
     }
 
     private async Task AddRuleAsync(CancellationToken cancellationToken)
@@ -313,7 +360,7 @@ public sealed class AutomationsViewModel : ObservableObject
         var actionTargetName = string.IsNullOrWhiteSpace(processName) ? null : processName;
         var rule = new AutomationRule
         {
-            Name = string.IsNullOrWhiteSpace(NewRuleName) ? $"{NewTriggerType} rule" : NewRuleName.Trim(),
+            Name = string.IsNullOrWhiteSpace(NewRuleName) ? $"{GetTriggerLabel(NewTriggerType)} rule" : NewRuleName.Trim(),
             Enabled = true,
             Trigger = new AutomationTrigger
             {
@@ -376,8 +423,8 @@ public sealed class AutomationsViewModel : ObservableObject
                 Type = AutomationActionType.SendNotification,
                 NotificationTitle = "Automation triggered",
                 NotificationMessage = string.IsNullOrWhiteSpace(processName)
-                    ? $"{NewTriggerType} threshold met. Priority set to {NewPriority}."
-                    : $"{processName} detected. Priority set to {NewPriority}."
+                    ? $"{GetTriggerLabel(NewTriggerType)} threshold met. Priority set to {GetPriorityLabel(NewPriority)}."
+                    : $"{processName} detected. Priority set to {GetPriorityLabel(NewPriority)}."
             });
         }
 
@@ -413,11 +460,32 @@ public sealed class AutomationsViewModel : ObservableObject
             ?? AvailablePowerPlans.FirstOrDefault();
     }
 
+    private static string GetTriggerLabel(AutomationTriggerType triggerType)
+        => triggerType switch
+        {
+            AutomationTriggerType.ProcessStarted => "App opens",
+            AutomationTriggerType.ProcessExited => "App closes",
+            AutomationTriggerType.CpuThreshold => "CPU gets busy",
+            AutomationTriggerType.MemoryThreshold => "RAM gets high",
+            _ => triggerType.ToString()
+        };
+
+    private static string GetPriorityLabel(ProcessPriorityClass priority)
+        => priority switch
+        {
+            ProcessPriorityClass.Idle => "very low background",
+            ProcessPriorityClass.BelowNormal => "lower background",
+            ProcessPriorityClass.Normal => "normal",
+            ProcessPriorityClass.AboveNormal => "small performance boost",
+            ProcessPriorityClass.High => "high performance",
+            _ => priority.ToString()
+        };
+
     private static AutomationRule CreateFocusedPerformanceRule(string powerPlanName)
     {
         return new AutomationRule
         {
-            Name = "Focused Performance: high-load app boost",
+            Name = SafePcBoostRuleName,
             Enabled = true,
             Trigger = new AutomationTrigger
             {
@@ -441,7 +509,7 @@ public sealed class AutomationsViewModel : ObservableObject
                 new AutomationAction
                 {
                     Type = AutomationActionType.SendNotification,
-                    NotificationTitle = "Focused Performance",
+                    NotificationTitle = "Safe PC Boost",
                     NotificationMessage = "A high-load process was detected and given a temporary priority boost."
                 }
             ]
