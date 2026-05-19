@@ -24,6 +24,22 @@ Phase 1 is implemented:
 
 Phase 2 and 3 are intentionally not faked. Models and service boundaries are ready for profiles, power plans, CPU affinity, suspend/resume, fullscreen/window triggers, GPU metrics, and plugin support.
 
+Phase 2 branch work adds:
+
+- Higher contrast dark theme resources for readable dropdowns, grids, buttons, editable cells, checkboxes, tooltips, scrollbars, and native dark title bars.
+- A presets-first automation builder with beginner-friendly labels for game launch boosts, safe PC boosts, and quiet background apps.
+- A default `Safe PC Boost` PC optimization profile that stays dormant until activated.
+- CPU affinity display and dashboard presets for all CPUs, first half, and second half.
+- Suspend and resume process actions using native Windows process handles.
+- Per-process and summary disk I/O rates from native process I/O counters when Windows grants access.
+- Automation CPU and RAM threshold triggers.
+- Automation CPU affinity actions with decimal or hex masks.
+- Automation Windows power plan actions with rollback to the previous plan when rollback protection is enabled.
+- Manual, temporary, and auto process-based profile activation.
+- Profile-scoped rule evaluation when a profile is active.
+
+The optimization profile is intentionally conservative. It does not clean RAM, force garbage collection, apply registry tweak packs, disable services blindly, or claim fake FPS gains. It uses measurable, reversible actions: priority changes, power plan switching, affinity options, notifications, logs, and rollback where possible.
+
 ## Requirements
 
 - Windows 10 or newer
@@ -78,14 +94,13 @@ The app avoids WMI polling in Phase 1. CPU and memory summary metrics use small 
 
 ## Notes For Next Steps
 
-Recommended Phase 2 implementation order:
+Recommended remaining Phase 2 work:
 
-1. Add CPU affinity UI and action support.
-2. Add manual/automatic profile activation semantics.
-3. Add power plan switching to automation actions using `PowerPlanService`.
-4. Add suspend/resume only after choosing a safe Windows API strategy.
-5. Add better disk metrics using PDH or ETW after measuring overhead.
-6. Add measured performance and latency profiles with before/after logs instead of placebo optimization claims.
+1. Add custom affinity mask editor UI beyond the current presets.
+2. Add a profile rule-assignment picker instead of editing rule IDs manually in JSON.
+3. Add measured performance and latency profiles with before/after logs instead of placebo optimization claims.
+4. Add startup registration wiring for the existing Start with Windows setting.
+5. Add compact-mode visual density changes across all pages.
 
 Recommended Phase 3 implementation order:
 

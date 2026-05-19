@@ -40,6 +40,11 @@ public sealed class DashboardViewModel : ObservableObject
         SetNormalPriorityCommand = new AsyncRelayCommand((parameter, token) => SetPriorityAsync(parameter, ProcessPriorityClass.Normal, token));
         SetAboveNormalPriorityCommand = new AsyncRelayCommand((parameter, token) => SetPriorityAsync(parameter, ProcessPriorityClass.AboveNormal, token));
         SetHighPriorityCommand = new AsyncRelayCommand((parameter, token) => SetPriorityAsync(parameter, ProcessPriorityClass.High, token));
+        SetAllCpusAffinityCommand = new AsyncRelayCommand((parameter, token) => SetAffinityAsync(parameter, CreateAllCpuMask(), token));
+        SetFirstHalfAffinityCommand = new AsyncRelayCommand((parameter, token) => SetAffinityAsync(parameter, CreateCpuRangeMask(0, Math.Max(1, Environment.ProcessorCount / 2)), token));
+        SetSecondHalfAffinityCommand = new AsyncRelayCommand((parameter, token) => SetAffinityAsync(parameter, CreateCpuRangeMask(Math.Max(1, Environment.ProcessorCount / 2), Environment.ProcessorCount), token));
+        SuspendProcessCommand = new AsyncRelayCommand((parameter, token) => SuspendProcessAsync(parameter, token));
+        ResumeProcessCommand = new AsyncRelayCommand((parameter, token) => ResumeProcessAsync(parameter, token));
 
         _processMonitorService.SnapshotUpdated += OnSnapshotUpdated;
     }
@@ -65,6 +70,16 @@ public sealed class DashboardViewModel : ObservableObject
     public AsyncRelayCommand SetAboveNormalPriorityCommand { get; }
 
     public AsyncRelayCommand SetHighPriorityCommand { get; }
+
+    public AsyncRelayCommand SetAllCpusAffinityCommand { get; }
+
+    public AsyncRelayCommand SetFirstHalfAffinityCommand { get; }
+
+    public AsyncRelayCommand SetSecondHalfAffinityCommand { get; }
+
+    public AsyncRelayCommand SuspendProcessCommand { get; }
+
+    public AsyncRelayCommand ResumeProcessCommand { get; }
 
     public string SearchText
     {
@@ -177,6 +192,60 @@ public sealed class DashboardViewModel : ObservableObject
         }
     }
 
+    private async Task SetAffinityAsync(object? parameter, long affinityMask, CancellationToken cancellationToken)
+    {
+        if (parameter is not ProcessRowViewModel process)
+        {
+            return;
+        }
+
+        var result = await _processActionService.SetCpuAffinityAsync(process.ProcessId, affinityMask, cancellationToken).ConfigureAwait(false);
+        if (!result.Succeeded)
+        {
+            System.Windows.Application.Current.Dispatcher.Invoke(() => _dialogService.ShowError("CPU Affinity Failed", result.Message));
+        }
+    }
+
+    private async Task SuspendProcessAsync(object? parameter, CancellationToken cancellationToken)
+    {
+        if (parameter is not ProcessRowViewModel process)
+        {
+            return;
+        }
+
+        var force = false;
+        if (process.IsCritical)
+        {
+            force = _dialogService.Confirm(
+                "Critical Process",
+                $"{process.Name} is a critical or protected Windows process. Suspending it can freeze Windows. Continue?");
+            if (!force)
+            {
+                return;
+            }
+        }
+
+        var result = await _processActionService.SuspendAsync(process.ProcessId, force, cancellationToken).ConfigureAwait(false);
+        if (!result.Succeeded)
+        {
+            System.Windows.Application.Current.Dispatcher.Invoke(() => _dialogService.ShowError("Suspend Failed", result.Message));
+        }
+    }
+
+    private async Task ResumeProcessAsync(object? parameter, CancellationToken cancellationToken)
+    {
+        if (parameter is not ProcessRowViewModel process)
+        {
+            return;
+        }
+
+        var result = await _processActionService.ResumeAsync(process.ProcessId, cancellationToken).ConfigureAwait(false);
+        if (!result.Succeeded)
+        {
+            System.Windows.Application.Current.Dispatcher.Invoke(() => _dialogService.ShowError("Resume Failed", result.Message));
+        }
+    }
+
     private async Task OpenFileLocationAsync(object? parameter, CancellationToken cancellationToken)
     {
         if (parameter is not ProcessRowViewModel process)
@@ -203,5 +272,25 @@ public sealed class DashboardViewModel : ObservableObject
         {
             System.Windows.Application.Current.Dispatcher.Invoke(() => _dialogService.ShowWarning("Copy Path", result.Message));
         }
+    }
+
+    private static long CreateAllCpuMask()
+    {
+        var count = Math.Clamp(Environment.ProcessorCount, 1, 62);
+        return (1L << count) - 1;
+    }
+
+    private static long CreateCpuRangeMask(int startInclusive, int endExclusive)
+    {
+        var count = Math.Clamp(Environment.ProcessorCount, 1, 62);
+        var start = Math.Clamp(startInclusive, 0, count - 1);
+        var end = Math.Clamp(endExclusive, start + 1, count);
+        long mask = 0;
+        for (var cpu = start; cpu < end; cpu++)
+        {
+            mask |= 1L << cpu;
+        }
+
+        return mask;
     }
 }

@@ -78,8 +78,10 @@ public sealed class AutomationRuleViewModel : ObservableObject
 
     public string TriggerSummary => _model.Trigger.Type switch
     {
-        AutomationTriggerType.ProcessStarted => $"When {_model.Trigger.ProcessName} starts",
-        AutomationTriggerType.ProcessExited => $"When {_model.Trigger.ProcessName} exits",
+        AutomationTriggerType.ProcessStarted => $"App opens: {_model.Trigger.ProcessName}",
+        AutomationTriggerType.ProcessExited => $"App closes: {_model.Trigger.ProcessName}",
+        AutomationTriggerType.CpuThreshold => $"CPU gets busy: {_model.Trigger.ProcessName ?? "any app"} at {_model.Trigger.Threshold:0.#}%",
+        AutomationTriggerType.MemoryThreshold => $"RAM gets high: {_model.Trigger.ProcessName ?? "any app"} at {_model.Trigger.Threshold:0.#} MB",
         _ => _model.Trigger.Type.ToString()
     };
 
@@ -94,10 +96,26 @@ public sealed class AutomationRuleViewModel : ObservableObject
 
             return string.Join(", ", _model.Actions.Select(action => action.Type switch
             {
-                AutomationActionType.SetProcessPriority => $"Set priority {action.Priority}",
-                AutomationActionType.SendNotification => "Notify",
+                AutomationActionType.SetProcessPriority => $"Priority -> {GetPriorityLabel(action.Priority)}",
+                AutomationActionType.SetCpuAffinity => $"CPU cores -> 0x{action.CpuAffinityMask:X}",
+                AutomationActionType.ChangePowerPlan => $"Power plan -> {action.PowerPlanName}",
+                AutomationActionType.SuspendProcess => $"Pause app -> {action.TargetProcessName}",
+                AutomationActionType.ResumeProcess => $"Resume app -> {action.TargetProcessName}",
+                AutomationActionType.SendNotification => "Show notification",
                 _ => action.Type.ToString()
             }));
         }
     }
+
+    private static string GetPriorityLabel(System.Diagnostics.ProcessPriorityClass? priority)
+        => priority switch
+        {
+            System.Diagnostics.ProcessPriorityClass.Idle => "very low",
+            System.Diagnostics.ProcessPriorityClass.BelowNormal => "lower",
+            System.Diagnostics.ProcessPriorityClass.Normal => "normal",
+            System.Diagnostics.ProcessPriorityClass.AboveNormal => "small boost",
+            System.Diagnostics.ProcessPriorityClass.High => "high",
+            null => "normal",
+            _ => priority.ToString() ?? "normal"
+        };
 }

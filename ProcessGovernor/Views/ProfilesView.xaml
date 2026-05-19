@@ -8,6 +8,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
@@ -20,31 +21,54 @@
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="150" />
-                    <ColumnDefinition Width="150" />
-                    <ColumnDefinition Width="150" />
+                    <ColumnDefinition Width="125" />
+                    <ColumnDefinition Width="125" />
+                    <ColumnDefinition Width="125" />
+                    <ColumnDefinition Width="125" />
+                    <ColumnDefinition Width="110" />
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0">
                     <TextBlock Text="Profile name" Foreground="{StaticResource MutedTextBrush}" />
                     <TextBox Text="{Binding NewProfileName, UpdateSourceTrigger=PropertyChanged}" Margin="0,5,12,0" />
                 </StackPanel>
-                <Button Grid.Column="1" Content="Add Profile" Style="{StaticResource AccentButton}" Command="{Binding AddProfileCommand}" Margin="0,19,8,0" />
-                <Button Grid.Column="2" Content="Delete Selected" Command="{Binding DeleteProfileCommand}" Margin="0,19,8,0" />
-                <Button Grid.Column="3" Content="Save" Command="{Binding SaveCommand}" Margin="0,19,0,0" />
+                <Button Grid.Column="1" Content="Add" Style="{StaticResource AccentButton}" Command="{Binding AddProfileCommand}" Margin="0,19,8,0" />
+                <Button Grid.Column="2" Content="Activate" Command="{Binding ActivateProfileCommand}" Margin="0,19,8,0" />
+                <Button Grid.Column="3" Content="Activate Temp" Command="{Binding ActivateTemporaryCommand}" Margin="0,19,8,0" />
+                <Button Grid.Column="4" Content="Clear Active" Command="{Binding ClearActiveProfilesCommand}" Margin="0,19,8,0" />
+                <StackPanel Grid.Column="5" Margin="0,0,0,0">
+                    <TextBlock Text="Minutes" Foreground="{StaticResource MutedTextBrush}" />
+                    <TextBox Text="{Binding TemporaryOverrideMinutes, UpdateSourceTrigger=PropertyChanged}" Margin="0,5,0,0" />
+                </StackPanel>
             </Grid>
         </Border>
 
-        <DataGrid Grid.Row="2"
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,0,8">
+            <Button Content="Reload" Command="{Binding ReloadCommand}" Margin="0,0,8,0" />
+            <Button Content="Delete Selected" Command="{Binding DeleteProfileCommand}" Margin="0,0,8,0" />
+            <Button Content="Save Changes" Command="{Binding SaveCommand}" Style="{StaticResource AccentButton}" />
+        </StackPanel>
+
+        <DataGrid Grid.Row="3"
                   ItemsSource="{Binding Profiles}"
                   SelectedItem="{Binding SelectedProfile}"
                   AutoGenerateColumns="False"
                   IsReadOnly="False"
                   SelectionMode="Single">
             <DataGrid.Columns>
-                <DataGridCheckBoxColumn Header="Enabled" Binding="{Binding Enabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="80" />
+                <DataGridCheckBoxColumn Header="Enabled"
+                                        Binding="{Binding Enabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                        ElementStyle="{StaticResource GridCheckBoxStyle}"
+                                        EditingElementStyle="{StaticResource GridCheckBoxStyle}"
+                                        Width="80" />
+                <DataGridCheckBoxColumn Header="Active"
+                                        Binding="{Binding IsActive, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                        ElementStyle="{StaticResource GridCheckBoxStyle}"
+                                        EditingElementStyle="{StaticResource GridCheckBoxStyle}"
+                                        Width="70" />
                 <DataGridTextColumn Header="Name" Binding="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="240" />
                 <DataGridTextColumn Header="Auto Process" Binding="{Binding AutoActivateProcessName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="220" />
                 <DataGridTextColumn Header="Order" Binding="{Binding PriorityOrder, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="100" />
+                <DataGridTextColumn Header="Temp Until UTC" Binding="{Binding TemporaryOverrideUntilUtc}" Width="180" />
                 <DataGridTextColumn Header="Rule Count" Binding="{Binding RuleIds.Count}" IsReadOnly="True" Width="120" />
                 <DataGridTextColumn Header="Id" Binding="{Binding Id}" IsReadOnly="True" Width="*" />
             </DataGrid.Columns>

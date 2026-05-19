@@ -118,7 +118,7 @@ public sealed class ProcessMonitorService : IProcessMonitorService, IDisposable
                         await _loggingService.LogAsync(
                             LogSeverity.Warning,
                             nameof(ProcessMonitorService),
-                            "Disk and GPU metrics are shown as Unavailable in Phase 1 because reliable low-overhead collection is not implemented yet.",
+                            "GPU metrics remain Unavailable until a reliable low-overhead collector is added. Disk metrics use native process I/O counters when Windows grants access.",
                             cancellationToken: cancellationToken).ConfigureAwait(false);
                     }
                 }
@@ -176,7 +176,7 @@ public sealed class ProcessMonitorService : IProcessMonitorService, IDisposable
             _metricStates.Remove(exitedPid);
         }
 
-        var summary = CaptureSystemSummary(snapshots.Count);
+        var summary = CaptureSystemSummary(snapshots);
         return new ProcessSnapshotBatch(
             snapshots.OrderByDescending(static item => item.CpuUsagePercent).ThenBy(static item => item.Name).ToList(),
             summary,
@@ -194,9 +194,14 @@ public sealed class ProcessMonitorService : IProcessMonitorService, IDisposable
         }
 
         var totalProcessorTime = SafeRead(() => process.TotalProcessorTime, TimeSpan.Zero);
-        var cpuUsage = CalculateProcessCpu(processId, totalProcessorTime, timestamp);
+        _metricStates.TryGetValue(processId, out var previousMetrics);
+        var cpuUsage = CalculateProcessCpu(previousMetrics, totalProcessorTime, timestamp);
+        var totalIoBytes = TryReadProcessIoBytes(processId);
+        var diskBytesPerSecond = CalculateDiskBytesPerSecond(previousMetrics, totalIoBytes, timestamp);
+        _metricStates[processId] = new ProcessMetricState(totalProcessorTime, timestamp, totalIoBytes);
         var workingSet = SafeRead(() => process.WorkingSet64, 0L);
         var priority = SafeRead<ProcessPriorityClass?>(() => process.PriorityClass, null);
+        var affinity = SafeRead<long?>(() => process.ProcessorAffinity.ToInt64(), null);
         var startTime = SafeRead<DateTimeOffset?>(() => process.StartTime, null);
         var executablePath = SafeRead<string?>(() => process.MainModule?.FileName, null);
         var hasExited = SafeRead(() => process.HasExited, false);
@@ -208,7 +213,10 @@ public sealed class ProcessMonitorService : IProcessMonitorService, IDisposable
             Name = name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? name : $"{name}.exe",
             CpuUsagePercent = cpuUsage,
             WorkingSetBytes = workingSet,
+            DiskUsage = diskBytesPerSecond is null ? "Unavailable" : $"{ProcessSnapshot.FormatBytes((long)diskBytesPerSecond.Value)}/s",
+            DiskBytesPerSecond = diskBytesPerSecond,
             Priority = priority,
+            CpuAffinityMask = affinity,
             Status = hasExited ? "Exited" : "Running",
             StartTime = startTime,
             ExecutablePath = executablePath,
@@ -217,16 +225,14 @@ public sealed class ProcessMonitorService : IProcessMonitorService, IDisposable
         };
     }
 
-    private double CalculateProcessCpu(int processId, TimeSpan totalProcessorTime, long timestamp)
+    private double CalculateProcessCpu(ProcessMetricState previous, TimeSpan totalProcessorTime, long timestamp)
     {
-        if (!_metricStates.TryGetValue(processId, out var previous))
+        if (previous.Timestamp == 0)
         {
-            _metricStates[processId] = new ProcessMetricState(totalProcessorTime, timestamp);
             return 0;
         }
 
         var elapsedSeconds = (timestamp - previous.Timestamp) / (double)Stopwatch.Frequency;
-        _metricStates[processId] = new ProcessMetricState(totalProcessorTime, timestamp);
 
         if (elapsedSeconds <= 0)
         {
@@ -238,7 +244,43 @@ public sealed class ProcessMonitorService : IProcessMonitorService, IDisposable
         return Math.Clamp(usage, 0, 100);
     }
 
-    private SystemSummary CaptureSystemSummary(int processCount)
+    private double? CalculateDiskBytesPerSecond(ProcessMetricState previous, ulong? totalIoBytes, long timestamp)
+    {
+        if (previous.Timestamp == 0 || previous.TotalIoBytes is null || totalIoBytes is null || totalIoBytes < previous.TotalIoBytes)
+        {
+            return null;
+        }
+
+        var elapsedSeconds = (timestamp - previous.Timestamp) / (double)Stopwatch.Frequency;
+        if (elapsedSeconds <= 0)
+        {
+            return null;
+        }
+
+        return (totalIoBytes.Value - previous.TotalIoBytes.Value) / elapsedSeconds;
+    }
+
+    private static ulong? TryReadProcessIoBytes(int processId)
+    {
+        var handle = NativeMethods.OpenProcess(NativeMethods.ProcessQueryLimitedInformation, false, processId);
+        if (handle == IntPtr.Zero || handle == new IntPtr(-1))
+        {
+            return null;
+        }
+
+        try
+        {
+            return NativeMethods.GetProcessIoCounters(handle, out var counters)
+                ? counters.TotalTransferBytes
+                : null;
+        }
+        finally
+        {
+            NativeMethods.CloseHandle(handle);
+        }
+    }
+
+    private SystemSummary CaptureSystemSummary(IReadOnlyList<ProcessSnapshot> snapshots)
     {
         var memoryStatus = NativeMethods.MemoryStatusEx.Create();
         var memoryAvailable = NativeMethods.GlobalMemoryStatusEx(ref memoryStatus);
@@ -246,15 +288,20 @@ public sealed class ProcessMonitorService : IProcessMonitorService, IDisposable
         var usedMemory = memoryAvailable ? (long)Math.Min(memoryStatus.TotalPhys - memoryStatus.AvailPhys, long.MaxValue) : 0;
         var memoryUsage = totalMemory > 0 ? usedMemory / (double)totalMemory * 100 : 0;
 
+        var diskBytesPerSecond = snapshots
+            .Where(static snapshot => snapshot.DiskBytesPerSecond is not null)
+            .Sum(static snapshot => snapshot.DiskBytesPerSecond!.Value);
+
         return new SystemSummary
         {
             CpuUsagePercent = CaptureCpuUsage(),
             MemoryUsagePercent = Math.Clamp(memoryUsage, 0, 100),
             UsedMemoryBytes = usedMemory,
             TotalMemoryBytes = totalMemory,
-            DiskActivity = "Unavailable",
+            DiskActivity = diskBytesPerSecond > 0 ? $"{ProcessSnapshot.FormatBytes((long)diskBytesPerSecond)}/s" : "0 B/s",
+            DiskBytesPerSecond = diskBytesPerSecond,
             GpuUsage = "Unavailable",
-            ProcessCount = processCount,
+            ProcessCount = snapshots.Count,
             Uptime = TimeSpan.FromMilliseconds(Environment.TickCount64)
         };
     }
@@ -334,7 +381,7 @@ public sealed class ProcessMonitorService : IProcessMonitorService, IDisposable
         }
     }
 
-    private readonly record struct ProcessMetricState(TimeSpan TotalProcessorTime, long Timestamp);
+    private readonly record struct ProcessMetricState(TimeSpan TotalProcessorTime, long Timestamp, ulong? TotalIoBytes);
 
     private readonly record struct CpuSample(ulong Idle, ulong Kernel, ulong User);
 }

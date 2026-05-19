@@ -25,6 +25,27 @@ public sealed partial class PowerPlanService : IPowerPlanService
         return match.Success ? match.Groups["name"].Value.Trim() : result.Message.Trim();
     }
 
+    public async Task<IReadOnlyList<PowerPlanInfo>> GetAvailablePlansAsync(CancellationToken cancellationToken)
+    {
+        var listResult = await RunPowerCfgAsync("/LIST", cancellationToken).ConfigureAwait(false);
+        if (!listResult.Succeeded)
+        {
+            return [];
+        }
+
+        return PowerPlanListRegex()
+            .Matches(listResult.Message)
+            .Select(match => new PowerPlanInfo
+            {
+                Id = match.Groups["id"].Value,
+                Name = match.Groups["name"].Value.Trim(),
+                IsActive = match.Groups["active"].Success
+            })
+            .OrderByDescending(static plan => plan.IsActive)
+            .ThenBy(static plan => plan.Name)
+            .ToList();
+    }
+
     public async Task<ProcessActionResult> SetActivePlanByNameAsync(string planName, CancellationToken cancellationToken)
     {
         var listResult = await RunPowerCfgAsync("/LIST", cancellationToken).ConfigureAwait(false);
@@ -89,9 +110,9 @@ public sealed partial class PowerPlanService : IPowerPlanService
         }
     }
 
-    [GeneratedRegex(@"Power Scheme GUID:\s*(?<id>[a-fA-F0-9-]+)\s*\((?<name>.+?)\)", RegexOptions.Compiled)]
+    [GeneratedRegex(@"Power Scheme GUID:\s*(?<id>[a-fA-F0-9-]+)\s*\((?<name>.+?)\)\s*(?<active>\*)?", RegexOptions.Compiled)]
     private static partial Regex ActivePlanRegex();
 
-    [GeneratedRegex(@"Power Scheme GUID:\s*(?<id>[a-fA-F0-9-]+)\s*\((?<name>.+?)\)", RegexOptions.Compiled)]
+    [GeneratedRegex(@"Power Scheme GUID:\s*(?<id>[a-fA-F0-9-]+)\s*\((?<name>.+?)\)\s*(?<active>\*)?", RegexOptions.Compiled)]
     private static partial Regex PowerPlanListRegex();
 }

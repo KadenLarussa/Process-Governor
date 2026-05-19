@@ -18,12 +18,15 @@ public enum AutomationTriggerType
 public enum AutomationActionType
 {
     SetProcessPriority,
+    SetCpuAffinity,
     SendNotification,
     LaunchApplication,
     CloseApplication,
     RunPowerShellCommand,
     ChangePowerPlan,
     MuteApplication,
+    SuspendProcess,
+    ResumeProcess,
     PauseMonitoring
 }
 
@@ -52,6 +55,8 @@ public sealed class AutomationAction
     public string? TargetProcessName { get; set; }
 
     public ProcessPriorityClass? Priority { get; set; }
+
+    public long? CpuAffinityMask { get; set; }
 
     public string? NotificationTitle { get; set; }
 
@@ -99,11 +104,26 @@ public sealed class AutomationProfile
 
     public bool Enabled { get; set; } = true;
 
+    public bool IsActive { get; set; }
+
     public int PriorityOrder { get; set; }
 
     public string? AutoActivateProcessName { get; set; }
 
+    public DateTimeOffset? TemporaryOverrideUntilUtc { get; set; }
+
     public List<string> RuleIds { get; set; } = [];
+}
+
+public sealed class PowerPlanInfo
+{
+    public string Id { get; set; } = string.Empty;
+
+    public string Name { get; set; } = string.Empty;
+
+    public bool IsActive { get; set; }
+
+    public override string ToString() => Name;
 }
 
 public sealed class AutomationStoreFile

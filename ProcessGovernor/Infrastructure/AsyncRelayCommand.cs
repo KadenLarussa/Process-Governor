@@ -77,5 +77,21 @@ public sealed class AsyncRelayCommand : ICommand
 
     public void Cancel() => _executionCancellation?.Cancel();
 
-    public void RaiseCanExecuteChanged() => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
+    public void RaiseCanExecuteChanged()
+    {
+        var handler = CanExecuteChanged;
+        if (handler is null)
+        {
+            return;
+        }
+
+        var dispatcher = System.Windows.Application.Current?.Dispatcher;
+        if (dispatcher is null || dispatcher.CheckAccess())
+        {
+            handler(this, EventArgs.Empty);
+            return;
+        }
+
+        dispatcher.BeginInvoke(() => handler(this, EventArgs.Empty));
+    }
 }

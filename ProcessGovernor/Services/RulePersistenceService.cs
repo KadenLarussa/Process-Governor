@@ -6,6 +6,8 @@ namespace ProcessGovernor.Services;
 
 public sealed class RulePersistenceService : IRulePersistenceService
 {
+    private const string SafePcBoostRuleName = "Safe PC Boost: busy app helper";
+    private const string LegacyFocusedRuleName = "Focused Performance: high-load app boost";
     private readonly AppPaths _paths;
     private readonly IJsonFileStore _store;
 
@@ -20,8 +22,10 @@ public sealed class RulePersistenceService : IRulePersistenceService
         var path = _paths.GetConfigPath("automations.json");
         var exists = File.Exists(path);
         var file = await _store.LoadAsync(path, CreateDefaultStore, cancellationToken).ConfigureAwait(false);
+        var changed = EnsureDefaultPresets(file);
+        changed |= RemoveRetiredDefaultRules(file);
 
-        if (!exists)
+        if (!exists || changed)
         {
             await SaveAsync(file, cancellationToken).ConfigureAwait(false);
         }
@@ -34,10 +38,19 @@ public sealed class RulePersistenceService : IRulePersistenceService
 
     private static AutomationStoreFile CreateDefaultStore()
     {
-        var cs2Rule = new AutomationRule
+        var store = new AutomationStoreFile();
+        EnsureDefaultPresets(store);
+        return store;
+    }
+
+    private static bool EnsureDefaultPresets(AutomationStoreFile store)
+    {
+        var changed = false;
+
+        var cs2Rule = EnsureRule(store, "Gaming Mode: CS2 launch boost", () => new AutomationRule
         {
-            Name = "CS2 priority notification",
-            Enabled = false,
+            Name = "Gaming Mode: CS2 launch boost",
+            Enabled = true,
             Trigger = new AutomationTrigger
             {
                 Type = AutomationTriggerType.ProcessStarted,
@@ -45,6 +58,7 @@ public sealed class RulePersistenceService : IRulePersistenceService
             },
             RevertOnExit = true,
             CooldownSeconds = 30,
+            DelaySeconds = 1,
             Actions =
             [
                 new AutomationAction
@@ -55,36 +69,188 @@ public sealed class RulePersistenceService : IRulePersistenceService
                 },
                 new AutomationAction
                 {
+                    Type = AutomationActionType.ChangePowerPlan,
+                    PowerPlanName = "High performance"
+                },
+                new AutomationAction
+                {
                     Type = AutomationActionType.SendNotification,
-                    NotificationTitle = "Gaming rule fired",
-                    NotificationMessage = "cs2.exe detected. Priority was set to High."
+                    NotificationTitle = "Gaming mode",
+                    NotificationMessage = "cs2.exe detected. Priority and power plan actions were applied."
                 }
             ]
-        };
+        }, ref changed);
 
-        return new AutomationStoreFile
+        RenameLegacyRule(store, LegacyFocusedRuleName, SafePcBoostRuleName, ref changed);
+        MergeLegacyProfile(store, "Focused Performance", "Safe PC Boost", ref changed);
+
+        _ = EnsureRule(store, SafePcBoostRuleName, () => new AutomationRule
         {
-            Rules = [cs2Rule],
-            Profiles =
+            Name = SafePcBoostRuleName,
+            Enabled = true,
+            Trigger = new AutomationTrigger
+            {
+                Type = AutomationTriggerType.CpuThreshold,
+                Threshold = 55
+            },
+            RevertOnExit = true,
+            CooldownSeconds = 180,
+            DelaySeconds = 0,
+            Actions =
             [
-                new AutomationProfile
+                new AutomationAction
                 {
-                    Name = "Gaming",
-                    PriorityOrder = 10,
-                    AutoActivateProcessName = "cs2.exe",
-                    RuleIds = [cs2Rule.Id]
+                    Type = AutomationActionType.SetProcessPriority,
+                    Priority = ProcessPriorityClass.AboveNormal
                 },
-                new AutomationProfile
+                new AutomationAction
                 {
-                    Name = "Work",
-                    PriorityOrder = 20
+                    Type = AutomationActionType.ChangePowerPlan,
+                    PowerPlanName = "High performance"
                 },
-                new AutomationProfile
+                new AutomationAction
                 {
-                    Name = "Quiet Mode",
-                    PriorityOrder = 30
+                    Type = AutomationActionType.SendNotification,
+                    NotificationTitle = "Safe PC Boost",
+                    NotificationMessage = "A high-load process was detected and given a temporary priority boost."
                 }
             ]
-        };
+        }, ref changed);
+
+        var focusedRule = store.Rules.First(static rule => rule.Name.Equals(SafePcBoostRuleName, StringComparison.OrdinalIgnoreCase));
+        EnsureProfile(store, "Safe PC Boost", 5, null, [focusedRule.Id], ref changed);
+        EnsureProfile(store, "Gaming", 10, "cs2.exe", [cs2Rule.Id], ref changed);
+        EnsureProfile(store, "Work", 20, null, [], ref changed);
+        EnsureProfile(store, "Quiet Mode", 30, null, [], ref changed);
+
+        return changed;
     }
+
+    private static bool RemoveRetiredDefaultRules(AutomationStoreFile store)
+    {
+        var retiredRules = store.Rules
+            .Where(static rule => !rule.Enabled && rule.Name.Equals("CS2 priority notification", StringComparison.OrdinalIgnoreCase))
+            .Select(static rule => rule.Id)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        if (retiredRules.Count == 0)
+        {
+            return false;
+        }
+
+        store.Rules.RemoveAll(rule => retiredRules.Contains(rule.Id));
+        foreach (var profile in store.Profiles)
+        {
+            profile.RuleIds.RemoveAll(ruleId => retiredRules.Contains(ruleId));
+        }
+
+        return true;
+    }
+
+    private static AutomationRule EnsureRule(AutomationStoreFile store, string name, Func<AutomationRule> factory, ref bool changed)
+    {
+        var existing = store.Rules.FirstOrDefault(rule => rule.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+        if (existing is not null)
+        {
+            return existing;
+        }
+
+        var rule = factory();
+        store.Rules.Add(rule);
+        changed = true;
+        return rule;
+    }
+
+    private static void RenameLegacyRule(AutomationStoreFile store, string oldName, string newName, ref bool changed)
+    {
+        if (store.Rules.Any(rule => rule.Name.Equals(newName, StringComparison.OrdinalIgnoreCase)))
+        {
+            return;
+        }
+
+        var legacyRule = store.Rules.FirstOrDefault(rule => rule.Name.Equals(oldName, StringComparison.OrdinalIgnoreCase));
+        if (legacyRule is null)
+        {
+            return;
+        }
+
+        legacyRule.Name = newName;
+        changed = true;
+    }
+
+    private static void MergeLegacyProfile(AutomationStoreFile store, string oldName, string newName, ref bool changed)
+    {
+        var legacyProfile = store.Profiles.FirstOrDefault(profile => profile.Name.Equals(oldName, StringComparison.OrdinalIgnoreCase));
+        if (legacyProfile is null)
+        {
+            return;
+        }
+
+        var newProfile = store.Profiles.FirstOrDefault(profile => profile.Name.Equals(newName, StringComparison.OrdinalIgnoreCase));
+        if (newProfile is null)
+        {
+            legacyProfile.Name = newName;
+            changed = true;
+            return;
+        }
+
+        foreach (var ruleId in legacyProfile.RuleIds)
+        {
+            if (!newProfile.RuleIds.Contains(ruleId, StringComparer.OrdinalIgnoreCase))
+            {
+                newProfile.RuleIds.Add(ruleId);
+            }
+        }
+
+        newProfile.Enabled |= legacyProfile.Enabled;
+        newProfile.IsActive |= legacyProfile.IsActive;
+        newProfile.PriorityOrder = Math.Min(newProfile.PriorityOrder, legacyProfile.PriorityOrder);
+        if (newProfile.TemporaryOverrideUntilUtc is null
+            || legacyProfile.TemporaryOverrideUntilUtc > newProfile.TemporaryOverrideUntilUtc)
+        {
+            newProfile.TemporaryOverrideUntilUtc = legacyProfile.TemporaryOverrideUntilUtc;
+        }
+
+        if (string.IsNullOrWhiteSpace(newProfile.AutoActivateProcessName))
+        {
+            newProfile.AutoActivateProcessName = legacyProfile.AutoActivateProcessName;
+        }
+
+        store.Profiles.Remove(legacyProfile);
+        changed = true;
+    }
+
+    private static AutomationProfile EnsureProfile(
+        AutomationStoreFile store,
+        string name,
+        int priorityOrder,
+        string? autoActivateProcessName,
+        IReadOnlyList<string> ruleIds,
+        ref bool changed)
+    {
+        var profile = store.Profiles.FirstOrDefault(profile => profile.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+        if (profile is null)
+        {
+            profile = new AutomationProfile
+            {
+                Name = name,
+                PriorityOrder = priorityOrder,
+                AutoActivateProcessName = autoActivateProcessName
+            };
+            store.Profiles.Add(profile);
+            changed = true;
+        }
+
+        foreach (var ruleId in ruleIds)
+        {
+            if (!profile.RuleIds.Contains(ruleId, StringComparer.OrdinalIgnoreCase))
+            {
+                profile.RuleIds.Add(ruleId);
+                changed = true;
+            }
+        }
+
+        return profile;
+    }
+
 }

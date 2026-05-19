@@ -14,9 +14,13 @@ public sealed class ProcessSnapshot
 
     public string DiskUsage { get; init; } = "Unavailable";
 
+    public double? DiskBytesPerSecond { get; init; }
+
     public string GpuUsage { get; init; } = "Unavailable";
 
     public ProcessPriorityClass? Priority { get; init; }
+
+    public long? CpuAffinityMask { get; init; }
 
     public string Status { get; init; } = "Running";
 
@@ -33,6 +37,8 @@ public sealed class ProcessSnapshot
     public string MemoryDisplay => FormatBytes(WorkingSetBytes);
 
     public string PriorityDisplay => Priority?.ToString() ?? "Unavailable";
+
+    public string AffinityDisplay => CpuAffinityMask is null ? "Unavailable" : $"0x{CpuAffinityMask.Value:X}";
 
     public string StartTimeDisplay => StartTime?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss") ?? "Unavailable";
 

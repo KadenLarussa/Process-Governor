@@ -12,6 +12,33 @@ internal static class NativeMethods
     [DllImport("kernel32.dll", SetLastError = true)]
     internal static extern bool GetSystemTimes(out FileTime idleTime, out FileTime kernelTime, out FileTime userTime);
 
+    // Used for low-overhead per-process disk I/O counters. Access can fail for protected processes.
+    [DllImport("kernel32.dll", SetLastError = true)]
+    internal static extern IntPtr OpenProcess(uint desiredAccess, bool inheritHandle, int processId);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    internal static extern bool CloseHandle(IntPtr handle);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    internal static extern bool GetProcessIoCounters(IntPtr processHandle, out IoCounters ioCounters);
+
+    // Windows exposes process suspend/resume through ntdll. These are real native calls, but access may be denied.
+    [DllImport("ntdll.dll")]
+    internal static extern int NtSuspendProcess(IntPtr processHandle);
+
+    [DllImport("ntdll.dll")]
+    internal static extern int NtResumeProcess(IntPtr processHandle);
+
+    // Enables a dark native title bar on supported Windows 10/11 builds.
+    [DllImport("dwmapi.dll")]
+    internal static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int attributeValue, int attributeSize);
+
+    internal const uint ProcessQueryLimitedInformation = 0x1000;
+    internal const uint ProcessSetInformation = 0x0200;
+    internal const uint ProcessSuspendResume = 0x0800;
+    internal const int DwmWindowAttributeUseImmersiveDarkMode = 20;
+    internal const int DwmWindowAttributeUseImmersiveDarkModeBefore20H1 = 19;
+
     [StructLayout(LayoutKind.Sequential)]
     internal struct FileTime
     {
@@ -41,5 +68,18 @@ internal static class NativeMethods
                 Length = (uint)Marshal.SizeOf<MemoryStatusEx>()
             };
         }
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct IoCounters
+    {
+        public ulong ReadOperationCount;
+        public ulong WriteOperationCount;
+        public ulong OtherOperationCount;
+        public ulong ReadTransferCount;
+        public ulong WriteTransferCount;
+        public ulong OtherTransferCount;
+
+        public ulong TotalTransferBytes => ReadTransferCount + WriteTransferCount;
     }
 }
