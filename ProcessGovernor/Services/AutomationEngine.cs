@@ -479,7 +479,11 @@ public sealed class AutomationEngine : IAutomationEngine, IDisposable
         var activeProfile = ResolveActiveProfile(batch);
         if (activeProfile is null)
         {
-            return enabledRules;
+            var profiledRuleIds = _store.Profiles
+                .Where(static profile => profile.Enabled)
+                .SelectMany(static profile => profile.RuleIds)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            return enabledRules.Where(rule => !profiledRuleIds.Contains(rule.Id)).ToList();
         }
 
         var ruleIds = activeProfile.RuleIds.ToHashSet(StringComparer.OrdinalIgnoreCase);

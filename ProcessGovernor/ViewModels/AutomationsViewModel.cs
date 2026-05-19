@@ -28,6 +28,7 @@ public sealed class AutomationsViewModel : ObservableObject
     private bool _newDryRun;
     private int _newCooldownSeconds = 30;
     private int _newDelaySeconds;
+    private string _presetStatus = "Presets are reversible and logged. Profile presets only run when the profile is active.";
 
     public AutomationsViewModel(
         IRulePersistenceService rulePersistenceService,
@@ -44,6 +45,10 @@ public sealed class AutomationsViewModel : ObservableObject
         DeleteRuleCommand = new AsyncRelayCommand(DeleteRuleAsync, () => SelectedRule is not null);
         SaveCommand = new AsyncRelayCommand(SaveAsync);
         ReloadCommand = new AsyncRelayCommand(LoadAsync);
+        UseGameLaunchPresetCommand = new RelayCommand(UseGameLaunchPreset);
+        UseFocusedPerformancePresetCommand = new RelayCommand(UseFocusedPerformancePreset);
+        UseQuietBackgroundPresetCommand = new RelayCommand(UseQuietBackgroundPreset);
+        AddFocusedPerformanceProfileCommand = new AsyncRelayCommand(AddFocusedPerformanceProfileAsync);
     }
 
     public ObservableCollection<AutomationRuleViewModel> Rules { get; } = [];
@@ -74,6 +79,14 @@ public sealed class AutomationsViewModel : ObservableObject
     public AsyncRelayCommand SaveCommand { get; }
 
     public AsyncRelayCommand ReloadCommand { get; }
+
+    public RelayCommand UseGameLaunchPresetCommand { get; }
+
+    public RelayCommand UseFocusedPerformancePresetCommand { get; }
+
+    public RelayCommand UseQuietBackgroundPresetCommand { get; }
+
+    public AsyncRelayCommand AddFocusedPerformanceProfileCommand { get; }
 
     public AutomationRuleViewModel? SelectedRule
     {
@@ -171,6 +184,12 @@ public sealed class AutomationsViewModel : ObservableObject
         set => SetProperty(ref _newDelaySeconds, Math.Clamp(value, 0, 3600));
     }
 
+    public string PresetStatus
+    {
+        get => _presetStatus;
+        set => SetProperty(ref _presetStatus, value);
+    }
+
     public async Task LoadAsync(CancellationToken cancellationToken = default)
     {
         _store = await _rulePersistenceService.LoadAsync(cancellationToken).ConfigureAwait(false);
@@ -189,8 +208,96 @@ public sealed class AutomationsViewModel : ObservableObject
                 AvailablePowerPlans.Add(plan.Name);
             }
 
-            NewPowerPlanName ??= AvailablePowerPlans.FirstOrDefault();
+            NewPowerPlanName ??= GetPreferredPowerPlanName();
         });
+    }
+
+    private void UseGameLaunchPreset()
+    {
+        NewRuleName = "Game Launch Boost";
+        NewProcessName = "game.exe";
+        NewTriggerType = AutomationTriggerType.ProcessStarted;
+        NewThresholdValue = 80;
+        NewPriority = ProcessPriorityClass.High;
+        NewAffinityEnabled = false;
+        NewAffinityMask = string.Empty;
+        NewPowerPlanEnabled = true;
+        NewPowerPlanName = GetPreferredPowerPlanName();
+        NewNotificationEnabled = true;
+        NewRevertOnExit = true;
+        NewDryRun = false;
+        NewCooldownSeconds = 30;
+        NewDelaySeconds = 1;
+        PresetStatus = "Game Launch Boost is ready. Replace game.exe with the executable you want to optimize.";
+    }
+
+    private void UseFocusedPerformancePreset()
+    {
+        NewRuleName = "Focused Performance: high-load app boost";
+        NewProcessName = string.Empty;
+        NewTriggerType = AutomationTriggerType.CpuThreshold;
+        NewThresholdValue = 55;
+        NewPriority = ProcessPriorityClass.AboveNormal;
+        NewAffinityEnabled = false;
+        NewAffinityMask = string.Empty;
+        NewPowerPlanEnabled = true;
+        NewPowerPlanName = GetPreferredPowerPlanName();
+        NewNotificationEnabled = true;
+        NewRevertOnExit = true;
+        NewDryRun = false;
+        NewCooldownSeconds = 180;
+        NewDelaySeconds = 0;
+        PresetStatus = "Focused Performance boosts whichever process crosses the CPU threshold.";
+    }
+
+    private void UseQuietBackgroundPreset()
+    {
+        NewRuleName = "Quiet Background App";
+        NewProcessName = "discord.exe";
+        NewTriggerType = AutomationTriggerType.ProcessStarted;
+        NewThresholdValue = 80;
+        NewPriority = ProcessPriorityClass.BelowNormal;
+        NewAffinityEnabled = false;
+        NewAffinityMask = string.Empty;
+        NewPowerPlanEnabled = false;
+        NewNotificationEnabled = true;
+        NewRevertOnExit = true;
+        NewDryRun = false;
+        NewCooldownSeconds = 60;
+        NewDelaySeconds = 0;
+        PresetStatus = "Quiet Background App is ready. Replace discord.exe with a helper app you want to de-prioritize.";
+    }
+
+    private async Task AddFocusedPerformanceProfileAsync(CancellationToken cancellationToken)
+    {
+        var rule = _store.Rules.FirstOrDefault(static rule => rule.Name.Equals("Focused Performance: high-load app boost", StringComparison.OrdinalIgnoreCase));
+        if (rule is null)
+        {
+            rule = CreateFocusedPerformanceRule(GetPreferredPowerPlanName() ?? "High performance");
+            _store.Rules.Add(rule);
+        }
+
+        var profile = _store.Profiles.FirstOrDefault(static profile => profile.Name.Equals("Focused Performance", StringComparison.OrdinalIgnoreCase));
+        if (profile is null)
+        {
+            profile = new AutomationProfile
+            {
+                Name = "Focused Performance",
+                PriorityOrder = 5,
+                Enabled = true
+            };
+            _store.Profiles.Add(profile);
+        }
+
+        if (!profile.RuleIds.Contains(rule.Id, StringComparer.OrdinalIgnoreCase))
+        {
+            profile.RuleIds.Add(rule.Id);
+        }
+
+        await _rulePersistenceService.SaveAsync(_store, cancellationToken).ConfigureAwait(false);
+        await _automationEngine.ReloadRulesAsync(cancellationToken).ConfigureAwait(false);
+        await LoadAsync(cancellationToken).ConfigureAwait(false);
+        PresetStatus = "Focused Performance profile is installed. Activate it from Profiles when you want the rule armed.";
     }
 
     private async Task AddRuleAsync(CancellationToken cancellationToken)
@@ -296,6 +403,49 @@ public sealed class AutomationsViewModel : ObservableObject
         }
 
         return long.TryParse(trimmed, out affinityMask) && affinityMask > 0;
+    }
+
+    private string? GetPreferredPowerPlanName()
+    {
+        return AvailablePowerPlans.FirstOrDefault(static plan => plan.Contains("Ultimate", StringComparison.OrdinalIgnoreCase))
+            ?? AvailablePowerPlans.FirstOrDefault(static plan => plan.Contains("High performance", StringComparison.OrdinalIgnoreCase))
+            ?? AvailablePowerPlans.FirstOrDefault(static plan => plan.Contains("Performance", StringComparison.OrdinalIgnoreCase))
+            ?? AvailablePowerPlans.FirstOrDefault();
+    }
+
+    private static AutomationRule CreateFocusedPerformanceRule(string powerPlanName)
+    {
+        return new AutomationRule
+        {
+            Name = "Focused Performance: high-load app boost",
+            Enabled = true,
+            Trigger = new AutomationTrigger
+            {
+                Type = AutomationTriggerType.CpuThreshold,
+                Threshold = 55
+            },
+            RevertOnExit = true,
+            CooldownSeconds = 180,
+            Actions =
+            [
+                new AutomationAction
+                {
+                    Type = AutomationActionType.SetProcessPriority,
+                    Priority = ProcessPriorityClass.AboveNormal
+                },
+                new AutomationAction
+                {
+                    Type = AutomationActionType.ChangePowerPlan,
+                    PowerPlanName = powerPlanName
+                },
+                new AutomationAction
+                {
+                    Type = AutomationActionType.SendNotification,
+                    NotificationTitle = "Focused Performance",
+                    NotificationMessage = "A high-load process was detected and given a temporary priority boost."
+                }
+            ]
+        };
     }
 
     private async Task DeleteRuleAsync(CancellationToken cancellationToken)

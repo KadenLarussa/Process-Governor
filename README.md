@@ -26,6 +26,9 @@ Phase 2 and 3 are intentionally not faked. Models and service boundaries are rea
 
 Phase 2 branch work adds:
 
+- Higher contrast dark theme resources for readable dropdowns, grids, buttons, and editable cells.
+- A presets-first automation builder for game launch boosts, focused performance, and quiet background apps.
+- A default `Focused Performance` PC optimization profile that stays dormant until activated.
 - CPU affinity display and dashboard presets for all CPUs, first half, and second half.
 - Suspend and resume process actions using native Windows process handles.
 - Per-process and summary disk I/O rates from native process I/O counters when Windows grants access.
@@ -34,6 +37,8 @@ Phase 2 branch work adds:
 - Automation Windows power plan actions with rollback to the previous plan when rollback protection is enabled.
 - Manual, temporary, and auto process-based profile activation.
 - Profile-scoped rule evaluation when a profile is active.
+
+The optimization profile is intentionally conservative. It does not clean RAM, force garbage collection, apply registry tweak packs, disable services blindly, or claim fake FPS gains. It uses measurable, reversible actions: priority changes, power plan switching, affinity options, notifications, logs, and rollback where possible.
 
 ## Requirements
 
