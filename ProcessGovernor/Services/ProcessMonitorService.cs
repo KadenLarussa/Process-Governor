@@ -50,7 +50,11 @@ public sealed class ProcessMonitorService : IProcessMonitorService, IDisposable
 
         _runnerCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         _runner = Task.Run(() => RunAsync(_runnerCancellation.Token), CancellationToken.None);
-        return Task.CompletedTask;
+        return _loggingService.LogAsync(
+            LogSeverity.Information,
+            nameof(ProcessMonitorService),
+            $"Process monitor started. Refresh={_normalInterval.TotalMilliseconds:0} ms, minimized refresh={_minimizedInterval.TotalMilliseconds:0} ms, pause minimized={_pauseWhenMinimized}.",
+            cancellationToken: cancellationToken);
     }
 
     public async Task StopAsync()
@@ -73,8 +77,12 @@ public sealed class ProcessMonitorService : IProcessMonitorService, IDisposable
             _runnerCancellation.Dispose();
             _runnerCancellation = null;
             _runner = null;
+            await _loggingService.LogAsync(LogSeverity.Information, nameof(ProcessMonitorService), "Process monitor stopped.").ConfigureAwait(false);
         }
     }
+
+    public Task<ProcessSnapshotBatch> CaptureOnceAsync(CancellationToken cancellationToken)
+        => Task.Run(CaptureSnapshot, cancellationToken);
 
     public void ApplySettings(AppSettings settings)
     {
