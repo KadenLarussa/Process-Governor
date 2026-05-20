@@ -8,6 +8,7 @@ namespace ProcessGovernor.Services;
 public sealed class ProcessMonitorService : IProcessMonitorService, IDisposable
 {
     private readonly ILoggingService _loggingService;
+    private readonly IWindowDetectionService _windowDetectionService;
     private readonly int _processorCount = Math.Max(1, Environment.ProcessorCount);
     private readonly Dictionary<int, ProcessMetricState> _metricStates = new();
     private readonly HashSet<int> _lastProcessIds = [];
@@ -22,9 +23,13 @@ public sealed class ProcessMonitorService : IProcessMonitorService, IDisposable
     private bool _loggedUnavailableMetrics;
     private CpuSample? _lastCpuSample;
 
-    public ProcessMonitorService(ILoggingService loggingService, ISettingsService settingsService)
+    public ProcessMonitorService(
+        ILoggingService loggingService,
+        ISettingsService settingsService,
+        IWindowDetectionService windowDetectionService)
     {
         _loggingService = loggingService;
+        _windowDetectionService = windowDetectionService;
         ApplySettings(settingsService.Current);
         settingsService.SettingsChanged += (_, settings) => ApplySettings(settings);
     }
@@ -177,11 +182,13 @@ public sealed class ProcessMonitorService : IProcessMonitorService, IDisposable
         }
 
         var summary = CaptureSystemSummary(snapshots);
+        var foregroundWindow = _windowDetectionService.CaptureForegroundWindow();
         return new ProcessSnapshotBatch(
             snapshots.OrderByDescending(static item => item.CpuUsagePercent).ThenBy(static item => item.Name).ToList(),
             summary,
             started,
-            exited);
+            exited,
+            foregroundWindow);
     }
 
     private ProcessSnapshot? CaptureProcess(Process process, long timestamp)

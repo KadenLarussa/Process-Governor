@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using System.Text;
 
 namespace ProcessGovernor.Core;
 
@@ -33,11 +34,34 @@ internal static class NativeMethods
     [DllImport("dwmapi.dll")]
     internal static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int attributeValue, int attributeSize);
 
+    // Foreground window reads power Phase 3 window/fullscreen triggers without WMI or extra polling loops.
+    [DllImport("user32.dll")]
+    internal static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    internal static extern int GetWindowText(IntPtr hwnd, StringBuilder text, int maxCount);
+
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    internal static extern int GetWindowTextLength(IntPtr hwnd);
+
+    [DllImport("user32.dll")]
+    internal static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint processId);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    internal static extern bool GetWindowRect(IntPtr hwnd, out Rect rect);
+
+    [DllImport("user32.dll")]
+    internal static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint flags);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    internal static extern bool GetMonitorInfo(IntPtr monitor, ref MonitorInfo monitorInfo);
+
     internal const uint ProcessQueryLimitedInformation = 0x1000;
     internal const uint ProcessSetInformation = 0x0200;
     internal const uint ProcessSuspendResume = 0x0800;
     internal const int DwmWindowAttributeUseImmersiveDarkMode = 20;
     internal const int DwmWindowAttributeUseImmersiveDarkModeBefore20H1 = 19;
+    internal const uint MonitorDefaultToNearest = 0x00000002;
 
     [StructLayout(LayoutKind.Sequential)]
     internal struct FileTime
@@ -81,5 +105,31 @@ internal static class NativeMethods
         public ulong OtherTransferCount;
 
         public ulong TotalTransferBytes => ReadTransferCount + WriteTransferCount;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct Rect
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct MonitorInfo
+    {
+        public int Size;
+        public Rect Monitor;
+        public Rect WorkArea;
+        public uint Flags;
+
+        public static MonitorInfo Create()
+        {
+            return new MonitorInfo
+            {
+                Size = Marshal.SizeOf<MonitorInfo>()
+            };
+        }
     }
 }

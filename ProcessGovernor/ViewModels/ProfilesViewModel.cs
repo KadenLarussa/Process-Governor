@@ -29,6 +29,8 @@ public sealed class ProfilesViewModel : ObservableObject
 
     public ObservableCollection<AutomationProfile> Profiles { get; } = [];
 
+    public ObservableCollection<ProfileRuleAssignmentViewModel> RuleAssignments { get; } = [];
+
     public AsyncRelayCommand AddProfileCommand { get; }
 
     public AsyncRelayCommand DeleteProfileCommand { get; }
@@ -53,9 +55,13 @@ public sealed class ProfilesViewModel : ObservableObject
                 DeleteProfileCommand.RaiseCanExecuteChanged();
                 ActivateProfileCommand.RaiseCanExecuteChanged();
                 ActivateTemporaryCommand.RaiseCanExecuteChanged();
+                RefreshRuleAssignments();
+                OnPropertyChanged(nameof(SelectedProfileName));
             }
         }
     }
+
+    public string SelectedProfileName => SelectedProfile?.Name ?? "Select a profile";
 
     public string NewProfileName
     {
@@ -72,6 +78,7 @@ public sealed class ProfilesViewModel : ObservableObject
     public async Task LoadAsync(CancellationToken cancellationToken = default)
     {
         _store = await _rulePersistenceService.LoadAsync(cancellationToken).ConfigureAwait(false);
+        var selectedProfileId = SelectedProfile?.Id;
         await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
         {
             Profiles.Clear();
@@ -79,6 +86,8 @@ public sealed class ProfilesViewModel : ObservableObject
             {
                 Profiles.Add(profile);
             }
+
+            SelectedProfile = Profiles.FirstOrDefault(profile => profile.Id == selectedProfileId) ?? Profiles.FirstOrDefault();
         });
     }
 
@@ -161,5 +170,19 @@ public sealed class ProfilesViewModel : ObservableObject
         _store.Profiles = Profiles.ToList();
         await _rulePersistenceService.SaveAsync(_store, cancellationToken).ConfigureAwait(false);
         await _automationEngine.ReloadRulesAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    private void RefreshRuleAssignments()
+    {
+        RuleAssignments.Clear();
+        if (SelectedProfile is null)
+        {
+            return;
+        }
+
+        foreach (var rule in _store.Rules.OrderBy(static rule => rule.Name))
+        {
+            RuleAssignments.Add(new ProfileRuleAssignmentViewModel(SelectedProfile, rule));
+        }
     }
 }

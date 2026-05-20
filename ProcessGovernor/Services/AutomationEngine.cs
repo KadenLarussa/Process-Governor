@@ -115,6 +115,7 @@ public sealed class AutomationEngine : IAutomationEngine, IDisposable
             await EvaluateExitedProcessesAsync(batch, exitedProcesses, cancellationToken).ConfigureAwait(false);
             await EvaluateStartedProcessesAsync(batch, cancellationToken).ConfigureAwait(false);
             await EvaluateThresholdRulesAsync(batch, cancellationToken).ConfigureAwait(false);
+            await EvaluateWindowRulesAsync(batch, cancellationToken).ConfigureAwait(false);
             RememberSnapshots(batch);
         }
         catch (OperationCanceledException)
@@ -195,12 +196,34 @@ public sealed class AutomationEngine : IAutomationEngine, IDisposable
         }
     }
 
+    private async Task EvaluateWindowRulesAsync(ProcessSnapshotBatch batch, CancellationToken cancellationToken)
+    {
+        if (batch.ForegroundWindow is null)
+        {
+            return;
+        }
+
+        foreach (var rule in GetCandidateRules(batch).Where(static rule => rule.Trigger.Type is AutomationTriggerType.WindowTitleDetected or AutomationTriggerType.FullscreenDetected))
+        {
+            if (IsOnCooldown(rule) || !_ruleEvaluationService.IsWindowMatch(rule, batch.ForegroundWindow, rule.Trigger.Type))
+            {
+                continue;
+            }
+
+            var triggerProcess = batch.Processes.FirstOrDefault(process => process.ProcessId == batch.ForegroundWindow.ProcessId)
+                ?? CreateWindowProcessSnapshot(batch.ForegroundWindow);
+            _lastRuleRunUtc[rule.Id] = DateTimeOffset.UtcNow;
+            await ExecuteRuleAsync(rule, triggerProcess, batch, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
     private async Task ExecuteRuleAsync(AutomationRule rule, ProcessSnapshot triggerProcess, ProcessSnapshotBatch batch, CancellationToken cancellationToken)
     {
         await _loggingService.LogAsync(
             LogSeverity.Information,
             nameof(AutomationEngine),
             $"Rule '{rule.Name}' triggered by {triggerProcess.Name} ({triggerProcess.ProcessId}).",
+            FormatTriggerMeasurement(triggerProcess),
             processId: triggerProcess.ProcessId,
             ruleId: rule.Id,
             cancellationToken: cancellationToken).ConfigureAwait(false);
@@ -216,6 +239,15 @@ public sealed class AutomationEngine : IAutomationEngine, IDisposable
         {
             await ExecuteActionAsync(rule, action, triggerProcess, batch, active, cancellationToken).ConfigureAwait(false);
         }
+
+        await _loggingService.LogAsync(
+            LogSeverity.Information,
+            nameof(AutomationEngine),
+            $"Rule '{rule.Name}' action pass completed.",
+            $"Actions={rule.Actions.Count}; RollbackTracked={active.OriginalPriorities.Count + active.OriginalAffinities.Count + (string.IsNullOrWhiteSpace(active.OriginalPowerPlanName) ? 0 : 1)}; DryRun={rule.DryRun}",
+            processId: triggerProcess.ProcessId,
+            ruleId: rule.Id,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
 
         if (rule.RevertOnExit
             && (active.OriginalPriorities.Count > 0
@@ -305,6 +337,17 @@ public sealed class AutomationEngine : IAutomationEngine, IDisposable
             {
                 await _loggingService.LogAsync(LogSeverity.Error, nameof(AutomationEngine), result.Message, result.Exception?.Message, target.ProcessId, rule.Id, cancellationToken).ConfigureAwait(false);
             }
+            else
+            {
+                await _loggingService.LogAsync(
+                    LogSeverity.Information,
+                    nameof(AutomationEngine),
+                    result.Message,
+                    $"MeasuredBefore: CPU={target.CpuUsagePercent:0.0}%, RAM={ProcessSnapshot.FormatBytes(target.WorkingSetBytes)}, Priority={originalPriority?.ToString() ?? "Unavailable"} -> {priority}",
+                    target.ProcessId,
+                    rule.Id,
+                    cancellationToken).ConfigureAwait(false);
+            }
         }
     }
 
@@ -345,6 +388,17 @@ public sealed class AutomationEngine : IAutomationEngine, IDisposable
             {
                 await _loggingService.LogAsync(LogSeverity.Error, nameof(AutomationEngine), result.Message, result.Exception?.Message, target.ProcessId, rule.Id, cancellationToken).ConfigureAwait(false);
             }
+            else
+            {
+                await _loggingService.LogAsync(
+                    LogSeverity.Information,
+                    nameof(AutomationEngine),
+                    result.Message,
+                    $"Affinity={originalAffinity?.ToString("X") ?? "Unavailable"} -> {affinityMask.Value:X}",
+                    target.ProcessId,
+                    rule.Id,
+                    cancellationToken).ConfigureAwait(false);
+            }
         }
     }
 
@@ -371,6 +425,16 @@ public sealed class AutomationEngine : IAutomationEngine, IDisposable
         if (!result.Succeeded)
         {
             await _loggingService.LogAsync(LogSeverity.Error, nameof(AutomationEngine), result.Message, result.Exception?.Message, ruleId: rule.Id, cancellationToken: cancellationToken).ConfigureAwait(false);
+        }
+        else
+        {
+            await _loggingService.LogAsync(
+                LogSeverity.Information,
+                nameof(AutomationEngine),
+                result.Message,
+                $"PowerPlan={active.OriginalPowerPlanName ?? "Unavailable"} -> {action.PowerPlanName}",
+                ruleId: rule.Id,
+                cancellationToken: cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -530,6 +594,21 @@ public sealed class AutomationEngine : IAutomationEngine, IDisposable
             .Where(process => RuleEvaluationService.MatchesProcessName(targetName, process.Name))
             .ToList();
     }
+
+    private static ProcessSnapshot CreateWindowProcessSnapshot(WindowSnapshot window)
+    {
+        return new ProcessSnapshot
+        {
+            ProcessId = window.ProcessId,
+            Name = window.ProcessName,
+            Status = window.IsFullscreen ? "Fullscreen" : "Foreground",
+            DiskUsage = "Unavailable",
+            GpuUsage = "Unavailable"
+        };
+    }
+
+    private static string FormatTriggerMeasurement(ProcessSnapshot process)
+        => $"MeasuredBefore: CPU={process.CpuUsagePercent:0.0}%, RAM={ProcessSnapshot.FormatBytes(process.WorkingSetBytes)}, Priority={process.Priority?.ToString() ?? "Unavailable"}, Affinity={(process.CpuAffinityMask is null ? "Unavailable" : $"0x{process.CpuAffinityMask.Value:X}")}";
 
     private IReadOnlyList<ProcessSnapshot> GetExitedProcesses(ProcessSnapshotBatch batch)
     {

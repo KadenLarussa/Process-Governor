@@ -38,6 +38,11 @@ Phase 2 branch work adds:
 - Manual, temporary, and auto process-based profile activation.
 - Profile-scoped rule evaluation when a profile is active.
 
+Phase 3 branch work adds:
+
+- Window title and fullscreen automation triggers using low-overhead foreground-window Win32 APIs.
+- Button-like automation toggles and clearer saved-rule state pills instead of checkbox-heavy rule editing.
+
 The optimization profile is intentionally conservative. It does not clean RAM, force garbage collection, apply registry tweak packs, disable services blindly, or claim fake FPS gains. It uses measurable, reversible actions: priority changes, power plan switching, affinity options, notifications, logs, and rollback where possible.
 
 ## Requirements
@@ -90,20 +95,4 @@ Important services:
 - `ElevationService`
 - `LoggingService`
 
-The app avoids WMI polling in Phase 1. CPU and memory summary metrics use small Win32 P/Invoke calls, while per-process data comes from `System.Diagnostics.Process`. Access denied and race conditions from short-lived processes are handled gracefully.
-
-## Notes For Next Steps
-
-Recommended remaining Phase 2 work:
-
-1. Add custom affinity mask editor UI beyond the current presets.
-2. Add a profile rule-assignment picker instead of editing rule IDs manually in JSON.
-3. Add measured performance and latency profiles with before/after logs instead of placebo optimization claims.
-4. Add startup registration wiring for the existing Start with Windows setting.
-5. Add compact-mode visual density changes across all pages.
-
-Recommended Phase 3 implementation order:
-
-1. Add window title and fullscreen detection.
-2. Add GPU metrics using a reliable source with explicit `Unavailable` fallback.
-3. Add plugin contracts after the core automation model stabilizes.
+The app avoids WMI polling for core process monitoring. CPU and memory summary metrics use small Win32 P/Invoke calls, while per-process data comes from `System.Diagnostics.Process`. Access denied and race conditions from short-lived processes are handled gracefully.

@@ -43,8 +43,11 @@ public sealed class AutomationRuleViewModel : ObservableObject
 
             _model.Enabled = value;
             OnPropertyChanged();
+            OnPropertyChanged(nameof(EnabledDisplay));
         }
     }
+
+    public string EnabledDisplay => Enabled ? "On" : "Off";
 
     public bool DryRun
     {
@@ -58,8 +61,11 @@ public sealed class AutomationRuleViewModel : ObservableObject
 
             _model.DryRun = value;
             OnPropertyChanged();
+            OnPropertyChanged(nameof(DryRunDisplay));
         }
     }
+
+    public string DryRunDisplay => DryRun ? "Test" : "Live";
 
     public bool RevertOnExit
     {
@@ -73,17 +79,13 @@ public sealed class AutomationRuleViewModel : ObservableObject
 
             _model.RevertOnExit = value;
             OnPropertyChanged();
+            OnPropertyChanged(nameof(RollbackDisplay));
         }
     }
 
-    public string TriggerSummary => _model.Trigger.Type switch
-    {
-        AutomationTriggerType.ProcessStarted => $"App opens: {_model.Trigger.ProcessName}",
-        AutomationTriggerType.ProcessExited => $"App closes: {_model.Trigger.ProcessName}",
-        AutomationTriggerType.CpuThreshold => $"CPU gets busy: {_model.Trigger.ProcessName ?? "any app"} at {_model.Trigger.Threshold:0.#}%",
-        AutomationTriggerType.MemoryThreshold => $"RAM gets high: {_model.Trigger.ProcessName ?? "any app"} at {_model.Trigger.Threshold:0.#} MB",
-        _ => _model.Trigger.Type.ToString()
-    };
+    public string RollbackDisplay => RevertOnExit ? "Undo" : "Keep";
+
+    public string TriggerSummary => GetTriggerSummary(_model);
 
     public string ActionSummary
     {
@@ -94,17 +96,41 @@ public sealed class AutomationRuleViewModel : ObservableObject
                 return "No actions";
             }
 
-            return string.Join(", ", _model.Actions.Select(action => action.Type switch
-            {
-                AutomationActionType.SetProcessPriority => $"Priority -> {GetPriorityLabel(action.Priority)}",
-                AutomationActionType.SetCpuAffinity => $"CPU cores -> 0x{action.CpuAffinityMask:X}",
-                AutomationActionType.ChangePowerPlan => $"Power plan -> {action.PowerPlanName}",
-                AutomationActionType.SuspendProcess => $"Pause app -> {action.TargetProcessName}",
-                AutomationActionType.ResumeProcess => $"Resume app -> {action.TargetProcessName}",
-                AutomationActionType.SendNotification => "Show notification",
-                _ => action.Type.ToString()
-            }));
+            return GetActionSummary(_model);
         }
+    }
+
+    public static string GetTriggerSummary(AutomationRule rule)
+        => rule.Trigger.Type switch
+        {
+            AutomationTriggerType.ProcessStarted => $"App opens: {rule.Trigger.ProcessName}",
+            AutomationTriggerType.ProcessExited => $"App closes: {rule.Trigger.ProcessName}",
+            AutomationTriggerType.CpuThreshold => $"CPU gets busy: {rule.Trigger.ProcessName ?? "any app"} at {rule.Trigger.Threshold:0.#}%",
+            AutomationTriggerType.MemoryThreshold => $"RAM gets high: {rule.Trigger.ProcessName ?? "any app"} at {rule.Trigger.Threshold:0.#} MB",
+            AutomationTriggerType.WindowTitleDetected => $"Window title: \"{rule.Trigger.WindowTitleContains}\"",
+            AutomationTriggerType.FullscreenDetected => string.IsNullOrWhiteSpace(rule.Trigger.ProcessName)
+                ? "Fullscreen app appears"
+                : $"Fullscreen: {rule.Trigger.ProcessName}",
+            _ => rule.Trigger.Type.ToString()
+        };
+
+    public static string GetActionSummary(AutomationRule rule)
+    {
+        if (rule.Actions.Count == 0)
+        {
+            return "No actions";
+        }
+
+        return string.Join(", ", rule.Actions.Select(action => action.Type switch
+        {
+            AutomationActionType.SetProcessPriority => $"Priority -> {GetPriorityLabel(action.Priority)}",
+            AutomationActionType.SetCpuAffinity => $"CPU cores -> 0x{action.CpuAffinityMask:X}",
+            AutomationActionType.ChangePowerPlan => $"Power plan -> {action.PowerPlanName}",
+            AutomationActionType.SuspendProcess => $"Pause app -> {action.TargetProcessName}",
+            AutomationActionType.ResumeProcess => $"Resume app -> {action.TargetProcessName}",
+            AutomationActionType.SendNotification => "Show notification",
+            _ => action.Type.ToString()
+        }));
     }
 
     private static string GetPriorityLabel(System.Diagnostics.ProcessPriorityClass? priority)
