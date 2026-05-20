@@ -56,12 +56,38 @@ internal static class NativeMethods
     [DllImport("user32.dll", SetLastError = true)]
     internal static extern bool GetMonitorInfo(IntPtr monitor, ref MonitorInfo monitorInfo);
 
+    // PDH is the least invasive built-in path for summary GPU activity on Windows.
+    // It can be absent or disabled on some systems, so callers must keep an Unavailable fallback.
+    [DllImport("pdh.dll", EntryPoint = "PdhOpenQueryW", CharSet = CharSet.Unicode)]
+    internal static extern uint PdhOpenQuery(string? dataSource, IntPtr userData, out IntPtr query);
+
+    [DllImport("pdh.dll", EntryPoint = "PdhAddEnglishCounterW", CharSet = CharSet.Unicode)]
+    internal static extern uint PdhAddEnglishCounter(IntPtr query, string fullCounterPath, IntPtr userData, out IntPtr counter);
+
+    [DllImport("pdh.dll")]
+    internal static extern uint PdhCollectQueryData(IntPtr query);
+
+    [DllImport("pdh.dll", EntryPoint = "PdhGetFormattedCounterArrayW", CharSet = CharSet.Unicode)]
+    internal static extern uint PdhGetFormattedCounterArray(
+        IntPtr counter,
+        uint format,
+        ref uint bufferSize,
+        ref uint itemCount,
+        IntPtr itemBuffer);
+
+    [DllImport("pdh.dll")]
+    internal static extern uint PdhCloseQuery(IntPtr query);
+
     internal const uint ProcessQueryLimitedInformation = 0x1000;
     internal const uint ProcessSetInformation = 0x0200;
     internal const uint ProcessSuspendResume = 0x0800;
     internal const int DwmWindowAttributeUseImmersiveDarkMode = 20;
     internal const int DwmWindowAttributeUseImmersiveDarkModeBefore20H1 = 19;
     internal const uint MonitorDefaultToNearest = 0x00000002;
+    internal const uint ErrorSuccess = 0x00000000;
+    internal const uint PdhCstatusNewData = 0x00000001;
+    internal const uint PdhMoreData = 0x800007D2;
+    internal const uint PdhFmtDouble = 0x00000200;
 
     [StructLayout(LayoutKind.Sequential)]
     internal struct FileTime
@@ -131,5 +157,19 @@ internal static class NativeMethods
                 Size = Marshal.SizeOf<MonitorInfo>()
             };
         }
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct PdhFmtCounterValue
+    {
+        public uint CStatus;
+        public double DoubleValue;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct PdhFmtCounterValueItem
+    {
+        public IntPtr Name;
+        public PdhFmtCounterValue FmtValue;
     }
 }

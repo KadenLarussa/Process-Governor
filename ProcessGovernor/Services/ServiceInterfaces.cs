@@ -52,6 +52,11 @@ public interface IProcessMonitorService
     void SetWindowMinimized(bool isMinimized);
 }
 
+public interface IGpuMetricsService
+{
+    GpuMetricSnapshot CaptureSummary();
+}
+
 public interface IProcessActionService
 {
     bool IsCriticalProcess(ProcessSnapshot process);

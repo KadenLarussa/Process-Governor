@@ -9,6 +9,7 @@ public sealed class ProcessMonitorService : IProcessMonitorService, IDisposable
 {
     private readonly ILoggingService _loggingService;
     private readonly IWindowDetectionService _windowDetectionService;
+    private readonly IGpuMetricsService _gpuMetricsService;
     private readonly int _processorCount = Math.Max(1, Environment.ProcessorCount);
     private readonly Dictionary<int, ProcessMetricState> _metricStates = new();
     private readonly HashSet<int> _lastProcessIds = [];
@@ -26,10 +27,12 @@ public sealed class ProcessMonitorService : IProcessMonitorService, IDisposable
     public ProcessMonitorService(
         ILoggingService loggingService,
         ISettingsService settingsService,
-        IWindowDetectionService windowDetectionService)
+        IWindowDetectionService windowDetectionService,
+        IGpuMetricsService gpuMetricsService)
     {
         _loggingService = loggingService;
         _windowDetectionService = windowDetectionService;
+        _gpuMetricsService = gpuMetricsService;
         ApplySettings(settingsService.Current);
         settingsService.SettingsChanged += (_, settings) => ApplySettings(settings);
     }
@@ -117,13 +120,13 @@ public sealed class ProcessMonitorService : IProcessMonitorService, IDisposable
                     LatestSnapshot = batch;
                     SnapshotUpdated?.Invoke(this, batch);
 
-                    if (!_loggedUnavailableMetrics)
+                    if (!_loggedUnavailableMetrics && batch.Summary.GpuUsage == "Unavailable")
                     {
                         _loggedUnavailableMetrics = true;
                         await _loggingService.LogAsync(
                             LogSeverity.Warning,
                             nameof(ProcessMonitorService),
-                            "GPU metrics remain Unavailable until a reliable low-overhead collector is added. Disk metrics use native process I/O counters when Windows grants access.",
+                            "GPU metrics are Unavailable because the Windows PDH GPU Engine counter did not return reliable data. Per-process GPU metrics remain Unavailable rather than estimated.",
                             cancellationToken: cancellationToken).ConfigureAwait(false);
                     }
                 }
@@ -298,6 +301,7 @@ public sealed class ProcessMonitorService : IProcessMonitorService, IDisposable
         var diskBytesPerSecond = snapshots
             .Where(static snapshot => snapshot.DiskBytesPerSecond is not null)
             .Sum(static snapshot => snapshot.DiskBytesPerSecond!.Value);
+        var gpuMetrics = _gpuMetricsService.CaptureSummary();
 
         return new SystemSummary
         {
@@ -307,7 +311,7 @@ public sealed class ProcessMonitorService : IProcessMonitorService, IDisposable
             TotalMemoryBytes = totalMemory,
             DiskActivity = diskBytesPerSecond > 0 ? $"{ProcessSnapshot.FormatBytes((long)diskBytesPerSecond)}/s" : "0 B/s",
             DiskBytesPerSecond = diskBytesPerSecond,
-            GpuUsage = "Unavailable",
+            GpuUsage = gpuMetrics.Display,
             ProcessCount = snapshots.Count,
             Uptime = TimeSpan.FromMilliseconds(Environment.TickCount64)
         };

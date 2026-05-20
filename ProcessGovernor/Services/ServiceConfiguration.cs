@@ -14,6 +14,7 @@ public static class ServiceConfiguration
             .AddSingleton<ISettingsService, SettingsService>()
             .AddSingleton<IStartupRegistrationService, StartupRegistrationService>()
             .AddSingleton<ILoggingService, LoggingService>()
+            .AddSingleton<IGpuMetricsService, GpuMetricsService>()
             .AddSingleton<IProcessMonitorService, ProcessMonitorService>()
             .AddSingleton<IProcessActionService, ProcessActionService>()
             .AddSingleton<IRulePersistenceService, RulePersistenceService>()
