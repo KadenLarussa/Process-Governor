@@ -12,6 +12,7 @@
 
             <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter" />
             <converters:SeverityBrushConverter x:Key="SeverityBrushConverter" />
+            <converters:BooleanLabelConverter x:Key="BoolLabelConverter" />
 
             <DataTemplate DataType="{x:Type viewModels:DashboardViewModel}">
                 <views:DashboardView />

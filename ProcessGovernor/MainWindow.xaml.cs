@@ -1,7 +1,9 @@
 using System.ComponentModel;
 using System.Windows;
+using System.Windows.Documents;
 using System.Windows.Interop;
 using ProcessGovernor.Core;
+using ProcessGovernor.Models;
 using ProcessGovernor.Services;
 
 namespace ProcessGovernor;
@@ -17,9 +19,16 @@ public partial class MainWindow : Window
         _settingsService = settingsService;
         _processMonitorService = processMonitorService;
         InitializeComponent();
+        ApplyDensity(_settingsService.Current.CompactMode);
+        _settingsService.SettingsChanged += OnSettingsChanged;
     }
 
     public void AllowExit() => _allowExit = true;
+
+    private void OnSettingsChanged(object? sender, AppSettings settings)
+    {
+        Dispatcher.InvokeAsync(() => ApplyDensity(settings.CompactMode));
+    }
 
     protected override void OnSourceInitialized(EventArgs e)
     {
@@ -50,6 +59,14 @@ public partial class MainWindow : Window
         }
 
         base.OnClosing(e);
+        _settingsService.SettingsChanged -= OnSettingsChanged;
+    }
+
+    private void ApplyDensity(bool compactMode)
+    {
+        RootShell.SetValue(TextElement.FontSizeProperty, compactMode ? 12.0 : 13.0);
+        Sidebar.Padding = compactMode ? new Thickness(12) : new Thickness(16);
+        PageHost.Margin = compactMode ? new Thickness(14) : new Thickness(22);
     }
 
     private void TryEnableDarkTitleBar()

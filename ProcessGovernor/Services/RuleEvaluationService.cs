@@ -25,6 +25,26 @@ public sealed class RuleEvaluationService : IRuleEvaluationService
         };
     }
 
+    public bool IsWindowMatch(AutomationRule rule, WindowSnapshot window, AutomationTriggerType triggerType)
+    {
+        if (!rule.Enabled || rule.Trigger.Type != triggerType)
+        {
+            return false;
+        }
+
+        return triggerType switch
+        {
+            AutomationTriggerType.WindowTitleDetected
+                => MatchesOptionalProcessName(rule.Trigger.ProcessName, window.ProcessName)
+                   && ContainsTitle(rule.Trigger.WindowTitleContains, window.Title),
+            AutomationTriggerType.FullscreenDetected
+                => window.IsFullscreen
+                   && MatchesOptionalProcessName(rule.Trigger.ProcessName, window.ProcessName)
+                   && MatchesOptionalTitle(rule.Trigger.WindowTitleContains, window.Title),
+            _ => false
+        };
+    }
+
     public static bool MatchesProcessName(string? configuredName, string processName)
     {
         if (string.IsNullOrWhiteSpace(configuredName))
@@ -46,6 +66,17 @@ public sealed class RuleEvaluationService : IRuleEvaluationService
     private static bool MatchesOptionalProcessName(string? configuredName, string processName)
     {
         return string.IsNullOrWhiteSpace(configuredName) || MatchesProcessName(configuredName, processName);
+    }
+
+    private static bool ContainsTitle(string? expectedTitleText, string actualTitle)
+    {
+        return !string.IsNullOrWhiteSpace(expectedTitleText)
+            && actualTitle.Contains(expectedTitleText.Trim(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool MatchesOptionalTitle(string? expectedTitleText, string actualTitle)
+    {
+        return string.IsNullOrWhiteSpace(expectedTitleText) || ContainsTitle(expectedTitleText, actualTitle);
     }
 
     private static double MegabytesToBytes(double megabytes) => megabytes * 1024 * 1024;

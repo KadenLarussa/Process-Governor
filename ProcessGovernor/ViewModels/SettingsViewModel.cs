@@ -7,6 +7,7 @@ namespace ProcessGovernor.ViewModels;
 public sealed class SettingsViewModel : ObservableObject
 {
     private readonly ISettingsService _settingsService;
+    private readonly IStartupRegistrationService _startupRegistrationService;
     private readonly IDialogService _dialogService;
     private int _refreshIntervalMs;
     private int _minimizedRefreshIntervalMs;
@@ -22,9 +23,13 @@ public sealed class SettingsViewModel : ObservableObject
     private string _accentColor = "#4CC2FF";
     private int _maxLogEntries;
 
-    public SettingsViewModel(ISettingsService settingsService, IDialogService dialogService)
+    public SettingsViewModel(
+        ISettingsService settingsService,
+        IStartupRegistrationService startupRegistrationService,
+        IDialogService dialogService)
     {
         _settingsService = settingsService;
+        _startupRegistrationService = startupRegistrationService;
         _dialogService = dialogService;
         SaveCommand = new AsyncRelayCommand(SaveAsync);
         LoadFrom(settingsService.Current);
@@ -146,7 +151,14 @@ public sealed class SettingsViewModel : ObservableObject
             MaxLogEntries = MaxLogEntries
         };
 
+        var startupResult = await _startupRegistrationService.SetEnabledAsync(settings.StartWithWindows, cancellationToken).ConfigureAwait(false);
+        if (!startupResult.Succeeded)
+        {
+            System.Windows.Application.Current.Dispatcher.Invoke(() => _dialogService.ShowError("Startup Registration Failed", startupResult.Message));
+            return;
+        }
+
         await _settingsService.SaveAsync(settings, cancellationToken).ConfigureAwait(false);
-        System.Windows.Application.Current.Dispatcher.Invoke(() => _dialogService.ShowInformation("Settings Saved", "Settings were saved locally."));
+        System.Windows.Application.Current.Dispatcher.Invoke(() => _dialogService.ShowInformation("Settings Saved", "Settings were saved locally and Windows startup registration is synced."));
     }
 }

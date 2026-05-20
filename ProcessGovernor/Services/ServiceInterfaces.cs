@@ -52,6 +52,11 @@ public interface IProcessMonitorService
     void SetWindowMinimized(bool isMinimized);
 }
 
+public interface IGpuMetricsService
+{
+    GpuMetricSnapshot CaptureSummary();
+}
+
 public interface IProcessActionService
 {
     bool IsCriticalProcess(ProcessSnapshot process);
@@ -85,6 +90,13 @@ public interface IRulePersistenceService
 public interface IRuleEvaluationService
 {
     bool IsMatch(AutomationRule rule, ProcessSnapshot process, AutomationTriggerType triggerType);
+
+    bool IsWindowMatch(AutomationRule rule, WindowSnapshot window, AutomationTriggerType triggerType);
+}
+
+public interface IStartupRegistrationService
+{
+    Task<ProcessActionResult> SetEnabledAsync(bool enabled, CancellationToken cancellationToken);
 }
 
 public interface IAutomationEngine
@@ -107,6 +119,11 @@ public interface IPowerPlanService
     Task<IReadOnlyList<PowerPlanInfo>> GetAvailablePlansAsync(CancellationToken cancellationToken);
 
     Task<ProcessActionResult> SetActivePlanByNameAsync(string planName, CancellationToken cancellationToken);
+}
+
+public interface IWindowDetectionService
+{
+    WindowSnapshot? CaptureForegroundWindow();
 }
 
 public interface INotificationService : IDisposable

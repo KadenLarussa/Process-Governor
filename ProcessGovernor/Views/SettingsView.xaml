@@ -41,14 +41,54 @@
 
                 <Border Style="{StaticResource CardBorder}" Margin="0,0,0,14">
                     <WrapPanel>
-                        <CheckBox Content="Minimize to tray" IsChecked="{Binding MinimizeToTray}" />
-                        <CheckBox Content="Close to tray" IsChecked="{Binding CloseToTray}" />
-                        <CheckBox Content="Start with Windows" IsChecked="{Binding StartWithWindows}" />
-                        <CheckBox Content="Compact mode" IsChecked="{Binding CompactMode}" />
-                        <CheckBox Content="Pause monitoring when minimized" IsChecked="{Binding PauseMonitoringWhenMinimized}" />
-                        <CheckBox Content="Safe mode" IsChecked="{Binding SafeMode}" />
-                        <CheckBox Content="Notifications" IsChecked="{Binding EnableNotifications}" />
-                        <CheckBox Content="Automatic rollback protection" IsChecked="{Binding AutomaticRollbackProtection}" />
+                        <ToggleButton Style="{StaticResource OptionToggleButton}" IsChecked="{Binding MinimizeToTray}" Margin="0,0,8,8">
+                            <StackPanel>
+                                <TextBlock Text="Minimize to tray" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding MinimizeToTray, Converter={StaticResource BoolLabelConverter}, ConverterParameter=On/Off}" FontSize="11" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
+                            </StackPanel>
+                        </ToggleButton>
+                        <ToggleButton Style="{StaticResource OptionToggleButton}" IsChecked="{Binding CloseToTray}" Margin="0,0,8,8">
+                            <StackPanel>
+                                <TextBlock Text="Close to tray" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding CloseToTray, Converter={StaticResource BoolLabelConverter}, ConverterParameter=On/Off}" FontSize="11" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
+                            </StackPanel>
+                        </ToggleButton>
+                        <ToggleButton Style="{StaticResource OptionToggleButton}" IsChecked="{Binding StartWithWindows}" Margin="0,0,8,8" ToolTip="Writes or removes the current user Run key entry when settings are saved.">
+                            <StackPanel>
+                                <TextBlock Text="Start with Windows" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding StartWithWindows, Converter={StaticResource BoolLabelConverter}, ConverterParameter=On/Off}" FontSize="11" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
+                            </StackPanel>
+                        </ToggleButton>
+                        <ToggleButton Style="{StaticResource OptionToggleButton}" IsChecked="{Binding CompactMode}" Margin="0,0,8,8">
+                            <StackPanel>
+                                <TextBlock Text="Compact mode" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding CompactMode, Converter={StaticResource BoolLabelConverter}, ConverterParameter=On/Off}" FontSize="11" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
+                            </StackPanel>
+                        </ToggleButton>
+                        <ToggleButton Style="{StaticResource OptionToggleButton}" IsChecked="{Binding PauseMonitoringWhenMinimized}" Margin="0,0,8,8">
+                            <StackPanel>
+                                <TextBlock Text="Pause minimized" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding PauseMonitoringWhenMinimized, Converter={StaticResource BoolLabelConverter}, ConverterParameter=On/Off}" FontSize="11" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
+                            </StackPanel>
+                        </ToggleButton>
+                        <ToggleButton Style="{StaticResource OptionToggleButton}" IsChecked="{Binding SafeMode}" Margin="0,0,8,8">
+                            <StackPanel>
+                                <TextBlock Text="Safe mode" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding SafeMode, Converter={StaticResource BoolLabelConverter}, ConverterParameter=On/Off}" FontSize="11" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
+                            </StackPanel>
+                        </ToggleButton>
+                        <ToggleButton Style="{StaticResource OptionToggleButton}" IsChecked="{Binding EnableNotifications}" Margin="0,0,8,8">
+                            <StackPanel>
+                                <TextBlock Text="Notifications" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding EnableNotifications, Converter={StaticResource BoolLabelConverter}, ConverterParameter=On/Off}" FontSize="11" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
+                            </StackPanel>
+                        </ToggleButton>
+                        <ToggleButton Style="{StaticResource OptionToggleButton}" IsChecked="{Binding AutomaticRollbackProtection}" Margin="0,0,8,8">
+                            <StackPanel>
+                                <TextBlock Text="Rollback protection" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding AutomaticRollbackProtection, Converter={StaticResource BoolLabelConverter}, ConverterParameter=On/Off}" FontSize="11" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
+                            </StackPanel>
+                        </ToggleButton>
                     </WrapPanel>
                 </Border>
 

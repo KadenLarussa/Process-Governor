@@ -20,6 +20,7 @@ public sealed class AutomationsViewModel : ObservableObject
     private AutomationRuleViewModel? _selectedRule;
     private string _newRuleName = "New Process Rule";
     private string _newProcessName = string.Empty;
+    private string _newWindowTitleContains = string.Empty;
     private AutomationTriggerType _newTriggerType = AutomationTriggerType.ProcessStarted;
     private double _newThresholdValue = 80;
     private ProcessPriorityClass _newPriority = ProcessPriorityClass.High;
@@ -52,7 +53,11 @@ public sealed class AutomationsViewModel : ObservableObject
         UseGameLaunchPresetCommand = new RelayCommand(UseGameLaunchPreset);
         UseFocusedPerformancePresetCommand = new RelayCommand(UseFocusedPerformancePreset);
         UseQuietBackgroundPresetCommand = new RelayCommand(UseQuietBackgroundPreset);
+        UseFullscreenFocusPresetCommand = new RelayCommand(UseFullscreenFocusPreset);
         AddFocusedPerformanceProfileCommand = new AsyncRelayCommand(AddFocusedPerformanceProfileAsync);
+        UseAllCpusAffinityCommand = new RelayCommand(() => ApplyAffinityPreset(CreateAllCpusMask()));
+        UseFirstHalfAffinityCommand = new RelayCommand(() => ApplyAffinityPreset(CreateHalfCpusMask(firstHalf: true)));
+        UseSecondHalfAffinityCommand = new RelayCommand(() => ApplyAffinityPreset(CreateHalfCpusMask(firstHalf: false)));
     }
 
     public ObservableCollection<AutomationRuleViewModel> Rules { get; } = [];
@@ -71,7 +76,9 @@ public sealed class AutomationsViewModel : ObservableObject
         new(AutomationTriggerType.ProcessStarted, "App opens", "Run the rule when a specific .exe starts."),
         new(AutomationTriggerType.ProcessExited, "App closes", "Run the rule when a specific .exe exits."),
         new(AutomationTriggerType.CpuThreshold, "CPU gets busy", "Run when an app crosses a CPU percentage."),
-        new(AutomationTriggerType.MemoryThreshold, "RAM gets high", "Run when an app crosses a RAM amount.")
+        new(AutomationTriggerType.MemoryThreshold, "RAM gets high", "Run when an app crosses a RAM amount."),
+        new(AutomationTriggerType.WindowTitleDetected, "Window title appears", "Run when the foreground window title contains text."),
+        new(AutomationTriggerType.FullscreenDetected, "Fullscreen app appears", "Run when a foreground app covers its monitor.")
     ];
 
     public ObservableCollection<string> AvailablePowerPlans { get; } = [];
@@ -90,7 +97,15 @@ public sealed class AutomationsViewModel : ObservableObject
 
     public RelayCommand UseQuietBackgroundPresetCommand { get; }
 
+    public RelayCommand UseFullscreenFocusPresetCommand { get; }
+
     public AsyncRelayCommand AddFocusedPerformanceProfileCommand { get; }
+
+    public RelayCommand UseAllCpusAffinityCommand { get; }
+
+    public RelayCommand UseFirstHalfAffinityCommand { get; }
+
+    public RelayCommand UseSecondHalfAffinityCommand { get; }
 
     public AutomationRuleViewModel? SelectedRule
     {
@@ -116,6 +131,12 @@ public sealed class AutomationsViewModel : ObservableObject
         set => SetProperty(ref _newProcessName, value);
     }
 
+    public string NewWindowTitleContains
+    {
+        get => _newWindowTitleContains;
+        set => SetProperty(ref _newWindowTitleContains, value);
+    }
+
     public AutomationTriggerType NewTriggerType
     {
         get => _newTriggerType;
@@ -124,6 +145,8 @@ public sealed class AutomationsViewModel : ObservableObject
             if (SetProperty(ref _newTriggerType, value))
             {
                 OnPropertyChanged(nameof(NewTriggerHelp));
+                OnPropertyChanged(nameof(UsesThreshold));
+                OnPropertyChanged(nameof(UsesWindowTitle));
             }
         }
     }
@@ -149,7 +172,13 @@ public sealed class AutomationsViewModel : ObservableObject
     public bool NewAffinityEnabled
     {
         get => _newAffinityEnabled;
-        set => SetProperty(ref _newAffinityEnabled, value);
+        set
+        {
+            if (SetProperty(ref _newAffinityEnabled, value))
+            {
+                OnPropertyChanged(nameof(NewAffinityState));
+            }
+        }
     }
 
     public string NewAffinityMask
@@ -161,7 +190,13 @@ public sealed class AutomationsViewModel : ObservableObject
     public bool NewPowerPlanEnabled
     {
         get => _newPowerPlanEnabled;
-        set => SetProperty(ref _newPowerPlanEnabled, value);
+        set
+        {
+            if (SetProperty(ref _newPowerPlanEnabled, value))
+            {
+                OnPropertyChanged(nameof(NewPowerPlanState));
+            }
+        }
     }
 
     public string? NewPowerPlanName
@@ -173,19 +208,37 @@ public sealed class AutomationsViewModel : ObservableObject
     public bool NewNotificationEnabled
     {
         get => _newNotificationEnabled;
-        set => SetProperty(ref _newNotificationEnabled, value);
+        set
+        {
+            if (SetProperty(ref _newNotificationEnabled, value))
+            {
+                OnPropertyChanged(nameof(NewNotificationState));
+            }
+        }
     }
 
     public bool NewRevertOnExit
     {
         get => _newRevertOnExit;
-        set => SetProperty(ref _newRevertOnExit, value);
+        set
+        {
+            if (SetProperty(ref _newRevertOnExit, value))
+            {
+                OnPropertyChanged(nameof(NewRollbackState));
+            }
+        }
     }
 
     public bool NewDryRun
     {
         get => _newDryRun;
-        set => SetProperty(ref _newDryRun, value);
+        set
+        {
+            if (SetProperty(ref _newDryRun, value))
+            {
+                OnPropertyChanged(nameof(NewDryRunState));
+            }
+        }
     }
 
     public int NewCooldownSeconds
@@ -206,12 +259,28 @@ public sealed class AutomationsViewModel : ObservableObject
         set => SetProperty(ref _presetStatus, value);
     }
 
+    public bool UsesThreshold => NewTriggerType is AutomationTriggerType.CpuThreshold or AutomationTriggerType.MemoryThreshold;
+
+    public bool UsesWindowTitle => NewTriggerType is AutomationTriggerType.WindowTitleDetected or AutomationTriggerType.FullscreenDetected;
+
+    public string NewPowerPlanState => NewPowerPlanEnabled ? "Enabled" : "Off";
+
+    public string NewAffinityState => NewAffinityEnabled ? "Enabled" : "Off";
+
+    public string NewNotificationState => NewNotificationEnabled ? "Enabled" : "Off";
+
+    public string NewRollbackState => NewRevertOnExit ? "Enabled" : "Off";
+
+    public string NewDryRunState => NewDryRun ? "Test mode" : "Live";
+
     public string NewTriggerHelp => NewTriggerType switch
     {
         AutomationTriggerType.ProcessStarted => "Best for games and apps. Type the executable name, for example cs2.exe.",
         AutomationTriggerType.ProcessExited => "Useful for cleanup rules after an app closes.",
         AutomationTriggerType.CpuThreshold => "Watches CPU load and boosts the matching app only after it gets busy.",
         AutomationTriggerType.MemoryThreshold => "Watches RAM usage. Threshold is entered in MB.",
+        AutomationTriggerType.WindowTitleDetected => "Watches the foreground window title. Useful for launchers, editors, and game menus.",
+        AutomationTriggerType.FullscreenDetected => "Detects a foreground app covering the monitor. Useful for borderless games and media apps.",
         _ => "Choose what should wake this rule up."
     };
 
@@ -251,6 +320,7 @@ public sealed class AutomationsViewModel : ObservableObject
     {
         NewRuleName = "Game Launch Boost";
         NewProcessName = "game.exe";
+        NewWindowTitleContains = string.Empty;
         NewTriggerType = AutomationTriggerType.ProcessStarted;
         NewThresholdValue = 80;
         NewPriority = ProcessPriorityClass.High;
@@ -270,6 +340,7 @@ public sealed class AutomationsViewModel : ObservableObject
     {
         NewRuleName = SafePcBoostRuleName;
         NewProcessName = string.Empty;
+        NewWindowTitleContains = string.Empty;
         NewTriggerType = AutomationTriggerType.CpuThreshold;
         NewThresholdValue = 55;
         NewPriority = ProcessPriorityClass.AboveNormal;
@@ -289,6 +360,7 @@ public sealed class AutomationsViewModel : ObservableObject
     {
         NewRuleName = "Quiet Background App";
         NewProcessName = "discord.exe";
+        NewWindowTitleContains = string.Empty;
         NewTriggerType = AutomationTriggerType.ProcessStarted;
         NewThresholdValue = 80;
         NewPriority = ProcessPriorityClass.BelowNormal;
@@ -301,6 +373,26 @@ public sealed class AutomationsViewModel : ObservableObject
         NewCooldownSeconds = 60;
         NewDelaySeconds = 0;
         PresetStatus = "Quiet Background is ready. Replace discord.exe with an app you want to make less pushy.";
+    }
+
+    private void UseFullscreenFocusPreset()
+    {
+        NewRuleName = "Fullscreen Focus";
+        NewProcessName = string.Empty;
+        NewWindowTitleContains = string.Empty;
+        NewTriggerType = AutomationTriggerType.FullscreenDetected;
+        NewThresholdValue = 80;
+        NewPriority = ProcessPriorityClass.AboveNormal;
+        NewAffinityEnabled = false;
+        NewAffinityMask = string.Empty;
+        NewPowerPlanEnabled = true;
+        NewPowerPlanName = GetPreferredPowerPlanName();
+        NewNotificationEnabled = true;
+        NewRevertOnExit = true;
+        NewDryRun = true;
+        NewCooldownSeconds = 180;
+        NewDelaySeconds = 1;
+        PresetStatus = "Fullscreen Focus is staged in test mode. Turn Test only off after you trust it.";
     }
 
     private async Task AddFocusedPerformanceProfileAsync(CancellationToken cancellationToken)
@@ -356,8 +448,16 @@ public sealed class AutomationsViewModel : ObservableObject
             return;
         }
 
+        if (NewTriggerType == AutomationTriggerType.WindowTitleDetected
+            && string.IsNullOrWhiteSpace(NewWindowTitleContains))
+        {
+            _dialogService.ShowWarning("Automation Rule", "Enter part of the window title to watch.");
+            return;
+        }
+
         var processName = NewProcessName.Trim();
         var actionTargetName = string.IsNullOrWhiteSpace(processName) ? null : processName;
+        var windowTitleText = NewWindowTitleContains.Trim();
         var rule = new AutomationRule
         {
             Name = string.IsNullOrWhiteSpace(NewRuleName) ? $"{GetTriggerLabel(NewTriggerType)} rule" : NewRuleName.Trim(),
@@ -368,6 +468,9 @@ public sealed class AutomationsViewModel : ObservableObject
                 ProcessName = actionTargetName,
                 Threshold = NewTriggerType is AutomationTriggerType.CpuThreshold or AutomationTriggerType.MemoryThreshold
                     ? NewThresholdValue
+                    : null,
+                WindowTitleContains = NewTriggerType is AutomationTriggerType.WindowTitleDetected or AutomationTriggerType.FullscreenDetected
+                    ? string.IsNullOrWhiteSpace(windowTitleText) ? null : windowTitleText
                     : null
             },
             CooldownSeconds = NewCooldownSeconds,
@@ -423,7 +526,7 @@ public sealed class AutomationsViewModel : ObservableObject
                 Type = AutomationActionType.SendNotification,
                 NotificationTitle = "Automation triggered",
                 NotificationMessage = string.IsNullOrWhiteSpace(processName)
-                    ? $"{GetTriggerLabel(NewTriggerType)} threshold met. Priority set to {GetPriorityLabel(NewPriority)}."
+                    ? $"{GetTriggerLabel(NewTriggerType)} matched. Priority set to {GetPriorityLabel(NewPriority)}."
                     : $"{processName} detected. Priority set to {GetPriorityLabel(NewPriority)}."
             });
         }
@@ -432,6 +535,7 @@ public sealed class AutomationsViewModel : ObservableObject
         Rules.Add(new AutomationRuleViewModel(rule));
         await SaveAsync(cancellationToken).ConfigureAwait(false);
         NewProcessName = string.Empty;
+        NewWindowTitleContains = string.Empty;
     }
 
     private static bool TryParseAffinityMask(string value, out long affinityMask)
@@ -452,6 +556,31 @@ public sealed class AutomationsViewModel : ObservableObject
         return long.TryParse(trimmed, out affinityMask) && affinityMask > 0;
     }
 
+    private void ApplyAffinityPreset(long affinityMask)
+    {
+        NewAffinityEnabled = true;
+        NewAffinityMask = $"0x{affinityMask:X}";
+    }
+
+    private static long CreateAllCpusMask()
+    {
+        var processorCount = Math.Clamp(Environment.ProcessorCount, 1, 62);
+        return (1L << processorCount) - 1;
+    }
+
+    private static long CreateHalfCpusMask(bool firstHalf)
+    {
+        var processorCount = Math.Clamp(Environment.ProcessorCount, 1, 62);
+        var half = Math.Max(1, processorCount / 2);
+        if (firstHalf)
+        {
+            return (1L << half) - 1;
+        }
+
+        var upperCount = processorCount - half;
+        return ((1L << upperCount) - 1) << half;
+    }
+
     private string? GetPreferredPowerPlanName()
     {
         return AvailablePowerPlans.FirstOrDefault(static plan => plan.Contains("Ultimate", StringComparison.OrdinalIgnoreCase))
@@ -467,6 +596,8 @@ public sealed class AutomationsViewModel : ObservableObject
             AutomationTriggerType.ProcessExited => "App closes",
             AutomationTriggerType.CpuThreshold => "CPU gets busy",
             AutomationTriggerType.MemoryThreshold => "RAM gets high",
+            AutomationTriggerType.WindowTitleDetected => "Window title appears",
+            AutomationTriggerType.FullscreenDetected => "Fullscreen app appears",
             _ => triggerType.ToString()
         };
 

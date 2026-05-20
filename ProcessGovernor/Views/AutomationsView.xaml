@@ -38,12 +38,13 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="1.05*" />
+                    <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
 
                 <TextBlock Grid.Row="0" Grid.ColumnSpan="4" Text="Starter presets" Style="{StaticResource SectionTitle}" />
@@ -90,14 +91,25 @@
                 <Button Grid.Row="1"
                         Grid.Column="3"
                         Style="{StaticResource PresetButton}"
-                        Command="{Binding AddFocusedPerformanceProfileCommand}"
-                        ToolTip="Installs the safe boost profile into Profiles. It stays reversible and can be activated only when wanted.">
+                        Command="{Binding UseFullscreenFocusPresetCommand}"
+                        ToolTip="Fills the builder with a Phase 3 fullscreen rule. It starts in test mode so you can watch logs before letting it change anything.">
                     <StackPanel>
-                        <TextBlock Text="PROFILE" Style="{StaticResource BadgeText}" />
-                        <TextBlock Text="Install Safe PC Boost" FontWeight="SemiBold" />
-                        <TextBlock Text="{Binding PresetStatus}" Foreground="{StaticResource MutedTextBrush}" TextWrapping="Wrap" />
+                        <TextBlock Text="PHASE 3" Style="{StaticResource BadgeText}" />
+                        <TextBlock Text="Fullscreen Focus" FontWeight="SemiBold" />
+                        <TextBlock Text="Detects borderless/fullscreen apps and stages a safe boost." Foreground="{StaticResource MutedTextBrush}" TextWrapping="Wrap" />
                     </StackPanel>
                 </Button>
+
+                <Border Grid.Row="2"
+                        Grid.ColumnSpan="4"
+                        Background="#101820"
+                        BorderBrush="{StaticResource BorderBrushSoft}"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Padding="10,8"
+                        Margin="0,12,0,0">
+                    <TextBlock Text="{Binding PresetStatus}" Foreground="{StaticResource MutedTextBrush}" TextWrapping="Wrap" />
+                </Border>
             </Grid>
         </Border>
 
@@ -111,6 +123,7 @@
 
                 <Grid Grid.Column="0" Margin="0,0,18,0">
                     <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
@@ -144,11 +157,18 @@
                         <TextBlock Text="{Binding NewTriggerHelp}" Style="{StaticResource HelperText}" />
                     </StackPanel>
 
-                    <StackPanel Grid.Row="2" Grid.Column="1">
+                    <StackPanel Grid.Row="2" Grid.Column="1" Visibility="{Binding UsesThreshold, Converter={StaticResource BoolToVisibilityConverter}}">
                         <TextBlock Text="Level" Style="{StaticResource FieldLabel}" />
                         <TextBox Text="{Binding NewThresholdValue, UpdateSourceTrigger=PropertyChanged}"
                                  ToolTip="For CPU rules, enter percent. For RAM rules, enter MB. App-open rules ignore this box." />
                         <TextBlock Text="Used only for CPU/RAM events." Style="{StaticResource HelperText}" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="3" Grid.ColumnSpan="2" Margin="0,10,0,0" Visibility="{Binding UsesWindowTitle, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <TextBlock Text="Window title contains" Style="{StaticResource FieldLabel}" />
+                        <TextBox Text="{Binding NewWindowTitleContains, UpdateSourceTrigger=PropertyChanged}"
+                                 ToolTip="Optional for fullscreen rules, required for window-title rules. Example: Counter-Strike, OBS, YouTube, Visual Studio." />
+                        <TextBlock Text="Phase 3 watches the foreground window once per process refresh, so this does not add another polling loop." Style="{StaticResource HelperText}" />
                     </StackPanel>
                 </Grid>
 
@@ -184,25 +204,76 @@
                     </StackPanel>
 
                     <WrapPanel Grid.Row="2" Grid.ColumnSpan="2">
-                        <CheckBox Content="Change power plan"
-                                  IsChecked="{Binding NewPowerPlanEnabled}"
-                                  ToolTip="Switches to the selected Windows power plan when the rule runs." />
-                        <CheckBox Content="Limit CPU cores"
-                                  IsChecked="{Binding NewAffinityEnabled}"
-                                  ToolTip="Advanced. Pins the app to selected CPU cores. Leave off unless you know the mask you want." />
-                        <TextBox Text="{Binding NewAffinityMask, UpdateSourceTrigger=PropertyChanged}"
-                                 Width="92"
-                                 Margin="0,0,12,0"
-                                 ToolTip="Advanced CPU core mask. Decimal or hex works, for example 0xFF." />
-                        <CheckBox Content="Notify me"
-                                  IsChecked="{Binding NewNotificationEnabled}"
-                                  ToolTip="Show a local Windows notification when the rule runs." />
-                        <CheckBox Content="Undo on exit"
-                                  IsChecked="{Binding NewRevertOnExit}"
-                                  ToolTip="Restores priority, affinity, and power plan when the triggering app exits whenever Process Governor captured the original value." />
-                        <CheckBox Content="Test only"
-                                  IsChecked="{Binding NewDryRun}"
-                                  ToolTip="Logs what would happen without changing anything." />
+                        <ToggleButton Style="{StaticResource OptionToggleButton}"
+                                      IsChecked="{Binding NewPowerPlanEnabled}"
+                                      Margin="0,0,8,8"
+                                      ToolTip="Switches to the selected Windows power plan when the rule runs.">
+                            <StackPanel>
+                                <TextBlock Text="Power plan" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding NewPowerPlanState}" FontSize="11" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
+                            </StackPanel>
+                        </ToggleButton>
+                        <ToggleButton Style="{StaticResource OptionToggleButton}"
+                                      IsChecked="{Binding NewAffinityEnabled}"
+                                      Margin="0,0,8,8"
+                                      ToolTip="Advanced. Pins the app to selected CPU cores. Leave off unless you know the mask you want.">
+                            <StackPanel>
+                                <TextBlock Text="CPU cores" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding NewAffinityState}" FontSize="11" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
+                            </StackPanel>
+                        </ToggleButton>
+                        <StackPanel Orientation="Horizontal"
+                                    Margin="0,0,8,8"
+                                    Visibility="{Binding NewAffinityEnabled, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <Button Content="All"
+                                    Command="{Binding UseAllCpusAffinityCommand}"
+                                    MinHeight="38"
+                                    Padding="10,6"
+                                    Margin="0,0,6,0"
+                                    ToolTip="Use all logical processors." />
+                            <Button Content="First half"
+                                    Command="{Binding UseFirstHalfAffinityCommand}"
+                                    MinHeight="38"
+                                    Padding="10,6"
+                                    Margin="0,0,6,0"
+                                    ToolTip="Use the lower-numbered half of logical processors." />
+                            <Button Content="Second half"
+                                    Command="{Binding UseSecondHalfAffinityCommand}"
+                                    MinHeight="38"
+                                    Padding="10,6"
+                                    Margin="0,0,6,0"
+                                    ToolTip="Use the higher-numbered half of logical processors." />
+                            <TextBox Text="{Binding NewAffinityMask, UpdateSourceTrigger=PropertyChanged}"
+                                     Width="92"
+                                     ToolTip="Advanced CPU core mask. Decimal or hex works, for example 0xFF." />
+                        </StackPanel>
+                        <ToggleButton Style="{StaticResource OptionToggleButton}"
+                                      IsChecked="{Binding NewNotificationEnabled}"
+                                      Margin="0,0,8,8"
+                                      ToolTip="Show a local Windows notification when the rule runs.">
+                            <StackPanel>
+                                <TextBlock Text="Notify" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding NewNotificationState}" FontSize="11" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
+                            </StackPanel>
+                        </ToggleButton>
+                        <ToggleButton Style="{StaticResource OptionToggleButton}"
+                                      IsChecked="{Binding NewRevertOnExit}"
+                                      Margin="0,0,8,8"
+                                      ToolTip="Restores priority, affinity, and power plan when the triggering app exits whenever Process Governor captured the original value.">
+                            <StackPanel>
+                                <TextBlock Text="Rollback" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding NewRollbackState}" FontSize="11" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
+                            </StackPanel>
+                        </ToggleButton>
+                        <ToggleButton Style="{StaticResource OptionToggleButton}"
+                                      IsChecked="{Binding NewDryRun}"
+                                      Margin="0,0,8,8"
+                                      ToolTip="Logs what would happen without changing anything.">
+                            <StackPanel>
+                                <TextBlock Text="Test only" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding NewDryRunState}" FontSize="11" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
+                            </StackPanel>
+                        </ToggleButton>
                     </WrapPanel>
                 </Grid>
 
@@ -243,24 +314,36 @@
                       IsReadOnly="False"
                       SelectionMode="Single">
                 <DataGrid.Columns>
-                    <DataGridCheckBoxColumn Header="Enabled"
-                                            Binding="{Binding Enabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                            ElementStyle="{StaticResource GridCheckBoxStyle}"
-                                            EditingElementStyle="{StaticResource GridCheckBoxStyle}"
-                                            Width="80" />
+                    <DataGridTemplateColumn Header="Enabled" Width="88">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <ToggleButton Style="{StaticResource GridToggleButton}"
+                                              IsChecked="{Binding Enabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                              Content="{Binding EnabledDisplay}" />
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
                     <DataGridTextColumn Header="Name" Binding="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="260" />
                     <DataGridTextColumn Header="Trigger" Binding="{Binding TriggerSummary}" IsReadOnly="True" Width="270" />
                     <DataGridTextColumn Header="Actions" Binding="{Binding ActionSummary}" IsReadOnly="True" Width="*" />
-                    <DataGridCheckBoxColumn Header="Dry Run"
-                                            Binding="{Binding DryRun, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                            ElementStyle="{StaticResource GridCheckBoxStyle}"
-                                            EditingElementStyle="{StaticResource GridCheckBoxStyle}"
-                                            Width="80" />
-                    <DataGridCheckBoxColumn Header="Rollback"
-                                            Binding="{Binding RevertOnExit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                            ElementStyle="{StaticResource GridCheckBoxStyle}"
-                                            EditingElementStyle="{StaticResource GridCheckBoxStyle}"
-                                            Width="80" />
+                    <DataGridTemplateColumn Header="Mode" Width="88">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <ToggleButton Style="{StaticResource GridToggleButton}"
+                                              IsChecked="{Binding DryRun, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                              Content="{Binding DryRunDisplay}" />
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTemplateColumn Header="Rollback" Width="88">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <ToggleButton Style="{StaticResource GridToggleButton}"
+                                              IsChecked="{Binding RevertOnExit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                              Content="{Binding RollbackDisplay}" />
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
                 </DataGrid.Columns>
             </DataGrid>
         </Grid>

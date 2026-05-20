@@ -48,30 +48,85 @@
             <Button Content="Save Changes" Command="{Binding SaveCommand}" Style="{StaticResource AccentButton}" />
         </StackPanel>
 
-        <DataGrid Grid.Row="3"
-                  ItemsSource="{Binding Profiles}"
-                  SelectedItem="{Binding SelectedProfile}"
-                  AutoGenerateColumns="False"
-                  IsReadOnly="False"
-                  SelectionMode="Single">
-            <DataGrid.Columns>
-                <DataGridCheckBoxColumn Header="Enabled"
-                                        Binding="{Binding Enabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                        ElementStyle="{StaticResource GridCheckBoxStyle}"
-                                        EditingElementStyle="{StaticResource GridCheckBoxStyle}"
-                                        Width="80" />
-                <DataGridCheckBoxColumn Header="Active"
-                                        Binding="{Binding IsActive, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                        ElementStyle="{StaticResource GridCheckBoxStyle}"
-                                        EditingElementStyle="{StaticResource GridCheckBoxStyle}"
-                                        Width="70" />
-                <DataGridTextColumn Header="Name" Binding="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="240" />
-                <DataGridTextColumn Header="Auto Process" Binding="{Binding AutoActivateProcessName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="220" />
-                <DataGridTextColumn Header="Order" Binding="{Binding PriorityOrder, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="100" />
-                <DataGridTextColumn Header="Temp Until UTC" Binding="{Binding TemporaryOverrideUntilUtc}" Width="180" />
-                <DataGridTextColumn Header="Rule Count" Binding="{Binding RuleIds.Count}" IsReadOnly="True" Width="120" />
-                <DataGridTextColumn Header="Id" Binding="{Binding Id}" IsReadOnly="True" Width="*" />
-            </DataGrid.Columns>
-        </DataGrid>
+        <Grid Grid.Row="3">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="1.1*" />
+                <ColumnDefinition Width="0.9*" />
+            </Grid.ColumnDefinitions>
+
+            <DataGrid Grid.Column="0"
+                      ItemsSource="{Binding Profiles}"
+                      SelectedItem="{Binding SelectedProfile}"
+                      AutoGenerateColumns="False"
+                      IsReadOnly="False"
+                      SelectionMode="Single"
+                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                      Margin="0,0,12,0">
+                <DataGrid.Columns>
+                    <DataGridTemplateColumn Header="Enabled" Width="68">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <ToggleButton Style="{StaticResource GridToggleButton}"
+                                              IsChecked="{Binding Enabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                              Content="{Binding Enabled, Converter={StaticResource BoolLabelConverter}, ConverterParameter=On/Off}" />
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTemplateColumn Header="Active" Width="68">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <ToggleButton Style="{StaticResource GridToggleButton}"
+                                              IsChecked="{Binding IsActive, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                              Content="{Binding IsActive, Converter={StaticResource BoolLabelConverter}, ConverterParameter=Active/Idle}" />
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTextColumn Header="Name" Binding="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="150" />
+                    <DataGridTextColumn Header="Auto Process" Binding="{Binding AutoActivateProcessName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="120" />
+                    <DataGridTextColumn Header="Order" Binding="{Binding PriorityOrder, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="58" />
+                    <DataGridTextColumn Header="Rules" Binding="{Binding RuleIds.Count}" IsReadOnly="True" Width="54" />
+                </DataGrid.Columns>
+            </DataGrid>
+
+            <Border Grid.Column="1" Style="{StaticResource CardBorder}" Margin="0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <StackPanel Grid.Row="0" Margin="0,0,0,10">
+                        <TextBlock Text="{Binding SelectedProfileName}" Style="{StaticResource SectionTitle}" />
+                        <TextBlock Text="Pick which saved rules belong to this profile. This replaces editing rule IDs in JSON." Style="{StaticResource MutedText}" />
+                    </StackPanel>
+                    <DataGrid Grid.Row="1"
+                              ItemsSource="{Binding RuleAssignments}"
+                              AutoGenerateColumns="False"
+                              IsReadOnly="False"
+                              RowHeight="54">
+                        <DataGrid.Columns>
+                            <DataGridTemplateColumn Header="Use" Width="74">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <ToggleButton Style="{StaticResource GridToggleButton}"
+                                                      IsChecked="{Binding IsAssigned, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                      Content="{Binding IsAssigned, Converter={StaticResource BoolLabelConverter}, ConverterParameter=In/Out}" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTemplateColumn Header="Rule" Width="*">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding RuleName}" FontWeight="SemiBold" />
+                                            <TextBlock Text="{Binding Trigger}" Foreground="{StaticResource MutedTextBrush}" FontSize="11" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </Border>
+        </Grid>
     </Grid>
 </UserControl>

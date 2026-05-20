@@ -10,13 +10,14 @@
         MinHeight="640"
         MinWidth="1040"
         WindowStartupLocation="CenterScreen">
-    <Grid Background="{StaticResource WindowBrush}">
+    <Grid x:Name="RootShell" Background="{StaticResource WindowBrush}">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="230" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
-        <Border Grid.Column="0"
+        <Border x:Name="Sidebar"
+                Grid.Column="0"
                 Background="#111820"
                 BorderBrush="{StaticResource BorderBrushSoft}"
                 BorderThickness="0,0,1,0"
@@ -48,7 +49,8 @@
             </DockPanel>
         </Border>
 
-        <ContentControl Grid.Column="1"
+        <ContentControl x:Name="PageHost"
+                        Grid.Column="1"
                         Content="{Binding CurrentPage}"
                         Margin="22" />
     </Grid>
