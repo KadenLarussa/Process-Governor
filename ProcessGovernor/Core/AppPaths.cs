@@ -3,10 +3,15 @@ namespace ProcessGovernor.Core;
 public sealed class AppPaths
 {
     public AppPaths()
+        : this(null)
     {
-        Root = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "ProcessGovernor");
+    }
+
+    public AppPaths(string? root)
+    {
+        Root = string.IsNullOrWhiteSpace(root)
+            ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ProcessGovernor")
+            : root;
         ConfigDirectory = Path.Combine(Root, "config");
         LogsDirectory = Path.Combine(Root, "logs");
     }

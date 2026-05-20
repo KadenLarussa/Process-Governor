@@ -154,11 +154,11 @@ public sealed class SettingsViewModel : ObservableObject
         var startupResult = await _startupRegistrationService.SetEnabledAsync(settings.StartWithWindows, cancellationToken).ConfigureAwait(false);
         if (!startupResult.Succeeded)
         {
-            System.Windows.Application.Current.Dispatcher.Invoke(() => _dialogService.ShowError("Startup Registration Failed", startupResult.Message));
+            UiDispatch.Invoke(() => _dialogService.ShowError("Startup Registration Failed", startupResult.Message));
             return;
         }
 
         await _settingsService.SaveAsync(settings, cancellationToken).ConfigureAwait(false);
-        System.Windows.Application.Current.Dispatcher.Invoke(() => _dialogService.ShowInformation("Settings Saved", "Settings were saved locally and Windows startup registration is synced."));
+        UiDispatch.Invoke(() => _dialogService.ShowInformation("Settings Saved", "Settings were saved locally and Windows startup registration is synced."));
     }
 }

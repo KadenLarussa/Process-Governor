@@ -9,7 +9,7 @@ public static class ServiceConfiguration
     public static AppServiceProvider BuildProvider()
     {
         return new ServiceRegistry()
-            .AddSingleton<AppPaths>()
+            .AddSingleton(_ => new AppPaths())
             .AddSingleton<IJsonFileStore, JsonFileStore>()
             .AddSingleton<ISettingsService, SettingsService>()
             .AddSingleton<IStartupRegistrationService, StartupRegistrationService>()
@@ -22,15 +22,18 @@ public static class ServiceConfiguration
             .AddSingleton<IAutomationEngine, AutomationEngine>()
             .AddSingleton<IPowerPlanService, PowerPlanService>()
             .AddSingleton<IWindowDetectionService, WindowDetectionService>()
+            .AddSingleton<IStartupDiagnosticsService, StartupDiagnosticsService>()
             .AddSingleton<INotificationService, NotificationService>()
             .AddSingleton<IElevationService, ElevationService>()
             .AddSingleton<IDialogService, DialogService>()
+            .AddSingleton<StartupDiagnosticsViewModel>()
             .AddSingleton<MainViewModel>()
             .AddSingleton<DashboardViewModel>()
             .AddSingleton<AutomationsViewModel>()
             .AddSingleton<ProfilesViewModel>()
             .AddSingleton<LogsViewModel>()
             .AddSingleton<SettingsViewModel>()
+            .AddSingleton<Views.StartupDiagnosticsWindow>()
             .AddSingleton<MainWindow>()
             .Build();
     }

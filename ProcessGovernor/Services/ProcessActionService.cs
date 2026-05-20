@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Windows;
+using ProcessGovernor.Infrastructure;
 using ProcessGovernor.Models;
 
 namespace ProcessGovernor.Services;
@@ -23,7 +24,7 @@ public sealed class ProcessActionService : IProcessActionService
             var processName = process.ProcessName;
             if (!forceCriticalProcess && IsCriticalProcessName(processName))
             {
-                return ProcessActionResult.Failure($"{processName} is a protected or critical Windows process.");
+                return await LogFailureAsync($"{processName} is a protected or critical Windows process.", null, processId, cancellationToken).ConfigureAwait(false);
             }
 
             process.Kill(entireProcessTree);
@@ -36,19 +37,19 @@ public sealed class ProcessActionService : IProcessActionService
         }
         catch (ArgumentException ex)
         {
-            return ProcessActionResult.Failure("The process no longer exists.", ex);
+            return await LogFailureAsync("The process no longer exists.", ex, processId, cancellationToken).ConfigureAwait(false);
         }
         catch (UnauthorizedAccessException ex)
         {
-            return ProcessActionResult.Failure("Access denied. Try running Process Governor as administrator.", ex);
+            return await LogFailureAsync("Access denied. Try running Process Governor as administrator.", ex, processId, cancellationToken).ConfigureAwait(false);
         }
         catch (System.ComponentModel.Win32Exception ex)
         {
-            return ProcessActionResult.Failure($"Windows refused the operation: {ex.Message}", ex);
+            return await LogFailureAsync($"Windows refused the operation: {ex.Message}", ex, processId, cancellationToken).ConfigureAwait(false);
         }
         catch (InvalidOperationException ex)
         {
-            return ProcessActionResult.Failure("The process exited before the action completed.", ex);
+            return await LogFailureAsync("The process exited before the action completed.", ex, processId, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -65,19 +66,19 @@ public sealed class ProcessActionService : IProcessActionService
         }
         catch (ArgumentException ex)
         {
-            return ProcessActionResult.Failure("The process no longer exists.", ex);
+            return await LogFailureAsync("The process no longer exists.", ex, processId, cancellationToken).ConfigureAwait(false);
         }
         catch (UnauthorizedAccessException ex)
         {
-            return ProcessActionResult.Failure("Access denied. Try running Process Governor as administrator.", ex);
+            return await LogFailureAsync("Access denied. Try running Process Governor as administrator.", ex, processId, cancellationToken).ConfigureAwait(false);
         }
         catch (System.ComponentModel.Win32Exception ex)
         {
-            return ProcessActionResult.Failure($"Windows refused the operation: {ex.Message}", ex);
+            return await LogFailureAsync($"Windows refused the operation: {ex.Message}", ex, processId, cancellationToken).ConfigureAwait(false);
         }
         catch (InvalidOperationException ex)
         {
-            return ProcessActionResult.Failure("The process exited before the action completed.", ex);
+            return await LogFailureAsync("The process exited before the action completed.", ex, processId, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -99,7 +100,7 @@ public sealed class ProcessActionService : IProcessActionService
     {
         if (affinityMask <= 0)
         {
-            return ProcessActionResult.Failure("CPU affinity mask must include at least one CPU.");
+            return await LogFailureAsync("CPU affinity mask must include at least one CPU.", null, processId, cancellationToken).ConfigureAwait(false);
         }
 
         try
@@ -113,19 +114,19 @@ public sealed class ProcessActionService : IProcessActionService
         }
         catch (ArgumentException ex)
         {
-            return ProcessActionResult.Failure("The process no longer exists.", ex);
+            return await LogFailureAsync("The process no longer exists.", ex, processId, cancellationToken).ConfigureAwait(false);
         }
         catch (UnauthorizedAccessException ex)
         {
-            return ProcessActionResult.Failure("Access denied. Try running Process Governor as administrator.", ex);
+            return await LogFailureAsync("Access denied. Try running Process Governor as administrator.", ex, processId, cancellationToken).ConfigureAwait(false);
         }
         catch (System.ComponentModel.Win32Exception ex)
         {
-            return ProcessActionResult.Failure($"Windows refused the operation: {ex.Message}", ex);
+            return await LogFailureAsync($"Windows refused the operation: {ex.Message}", ex, processId, cancellationToken).ConfigureAwait(false);
         }
         catch (InvalidOperationException ex)
         {
-            return ProcessActionResult.Failure("The process exited before the action completed.", ex);
+            return await LogFailureAsync("The process exited before the action completed.", ex, processId, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -151,13 +152,13 @@ public sealed class ProcessActionService : IProcessActionService
             using var process = Process.GetProcessById(processId);
             if (!forceCriticalProcess && IsCriticalProcessName(process.ProcessName))
             {
-                return ProcessActionResult.Failure($"{process.ProcessName} is a protected or critical Windows process.");
+                return await LogFailureAsync($"{process.ProcessName} is a protected or critical Windows process.", null, processId, cancellationToken).ConfigureAwait(false);
             }
 
             var handle = Core.NativeMethods.OpenProcess(Core.NativeMethods.ProcessSuspendResume, false, processId);
             if (handle == IntPtr.Zero || handle == new IntPtr(-1))
             {
-                return ProcessActionResult.Failure("Unable to open the process for suspend. Try running as administrator.");
+                return await LogFailureAsync("Unable to open the process for suspend. Try running as administrator.", null, processId, cancellationToken).ConfigureAwait(false);
             }
 
             try
@@ -165,7 +166,7 @@ public sealed class ProcessActionService : IProcessActionService
                 var status = Core.NativeMethods.NtSuspendProcess(handle);
                 if (status != 0)
                 {
-                    return ProcessActionResult.Failure($"Windows refused suspend with NTSTATUS 0x{status:X8}.");
+                    return await LogFailureAsync($"Windows refused suspend with NTSTATUS 0x{status:X8}.", null, processId, cancellationToken).ConfigureAwait(false);
                 }
             }
             finally
@@ -179,11 +180,11 @@ public sealed class ProcessActionService : IProcessActionService
         }
         catch (ArgumentException ex)
         {
-            return ProcessActionResult.Failure("The process no longer exists.", ex);
+            return await LogFailureAsync("The process no longer exists.", ex, processId, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is UnauthorizedAccessException or System.ComponentModel.Win32Exception or InvalidOperationException)
         {
-            return ProcessActionResult.Failure($"Suspend failed: {ex.Message}", ex);
+            return await LogFailureAsync($"Suspend failed: {ex.Message}", ex, processId, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -196,7 +197,7 @@ public sealed class ProcessActionService : IProcessActionService
             var handle = Core.NativeMethods.OpenProcess(Core.NativeMethods.ProcessSuspendResume, false, processId);
             if (handle == IntPtr.Zero || handle == new IntPtr(-1))
             {
-                return ProcessActionResult.Failure("Unable to open the process for resume. Try running as administrator.");
+                return await LogFailureAsync("Unable to open the process for resume. Try running as administrator.", null, processId, cancellationToken).ConfigureAwait(false);
             }
 
             try
@@ -204,7 +205,7 @@ public sealed class ProcessActionService : IProcessActionService
                 var status = Core.NativeMethods.NtResumeProcess(handle);
                 if (status != 0)
                 {
-                    return ProcessActionResult.Failure($"Windows refused resume with NTSTATUS 0x{status:X8}.");
+                    return await LogFailureAsync($"Windows refused resume with NTSTATUS 0x{status:X8}.", null, processId, cancellationToken).ConfigureAwait(false);
                 }
             }
             finally
@@ -218,11 +219,11 @@ public sealed class ProcessActionService : IProcessActionService
         }
         catch (ArgumentException ex)
         {
-            return ProcessActionResult.Failure("The process no longer exists.", ex);
+            return await LogFailureAsync("The process no longer exists.", ex, processId, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is UnauthorizedAccessException or System.ComponentModel.Win32Exception or InvalidOperationException)
         {
-            return ProcessActionResult.Failure($"Resume failed: {ex.Message}", ex);
+            return await LogFailureAsync($"Resume failed: {ex.Message}", ex, processId, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -231,7 +232,7 @@ public sealed class ProcessActionService : IProcessActionService
         cancellationToken.ThrowIfCancellationRequested();
         if (string.IsNullOrWhiteSpace(executablePath) || !File.Exists(executablePath))
         {
-            return ProcessActionResult.Failure("Executable path is unavailable.");
+            return await LogFailureAsync("Executable path is unavailable.", null, null, cancellationToken).ConfigureAwait(false);
         }
 
         try
@@ -248,7 +249,7 @@ public sealed class ProcessActionService : IProcessActionService
         }
         catch (Exception ex)
         {
-            return ProcessActionResult.Failure($"Unable to open file location: {ex.Message}", ex);
+            return await LogFailureAsync($"Unable to open file location: {ex.Message}", ex, null, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -256,10 +257,10 @@ public sealed class ProcessActionService : IProcessActionService
     {
         if (string.IsNullOrWhiteSpace(executablePath))
         {
-            return ProcessActionResult.Failure("Executable path is unavailable.");
+            return await LogFailureAsync("Executable path is unavailable.", null, null, cancellationToken).ConfigureAwait(false);
         }
 
-        await System.Windows.Application.Current.Dispatcher.InvokeAsync(() => System.Windows.Clipboard.SetText(executablePath));
+        await UiDispatch.InvokeAsync(() => System.Windows.Clipboard.SetText(executablePath));
         await _loggingService.LogAsync(LogSeverity.Information, nameof(ProcessActionService), $"Copied path: {executablePath}.", cancellationToken: cancellationToken).ConfigureAwait(false);
         return ProcessActionResult.Success("Copied path.");
     }
@@ -279,5 +280,17 @@ public sealed class ProcessActionService : IProcessActionService
             || normalized.Equals("winlogon", StringComparison.OrdinalIgnoreCase)
             || normalized.Equals("services", StringComparison.OrdinalIgnoreCase)
             || normalized.Equals("lsass", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async Task<ProcessActionResult> LogFailureAsync(string message, Exception? exception, int? processId, CancellationToken cancellationToken)
+    {
+        await _loggingService.LogAsync(
+            LogSeverity.Warning,
+            nameof(ProcessActionService),
+            message,
+            exception?.Message,
+            processId,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+        return ProcessActionResult.Failure(message, exception);
     }
 }

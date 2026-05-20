@@ -3,6 +3,7 @@ using ProcessGovernor.Core;
 using ProcessGovernor.Infrastructure;
 using ProcessGovernor.Services;
 using ProcessGovernor.ViewModels;
+using ProcessGovernor.Views;
 
 namespace ProcessGovernor;
 
@@ -14,36 +15,52 @@ public partial class App : System.Windows.Application
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
         _appCancellation = new CancellationTokenSource();
         try
         {
             _provider = ServiceConfiguration.BuildProvider();
-            _provider.GetRequiredService<AppPaths>().EnsureCreated();
+            var diagnosticsViewModel = _provider.GetRequiredService<StartupDiagnosticsViewModel>();
+            var diagnosticsWindow = _provider.GetRequiredService<StartupDiagnosticsWindow>();
+            diagnosticsWindow.DataContext = diagnosticsViewModel;
+            diagnosticsWindow.Show();
 
-            var settingsService = _provider.GetRequiredService<ISettingsService>();
-            var loggingService = _provider.GetRequiredService<ILoggingService>();
-            var automationEngine = _provider.GetRequiredService<IAutomationEngine>();
-            var processMonitor = _provider.GetRequiredService<IProcessMonitorService>();
+            var diagnosticsProgress = new Progress<Models.StartupCheckUpdate>(diagnosticsViewModel.Apply);
+            var diagnosticsResult = await _provider
+                .GetRequiredService<IStartupDiagnosticsService>()
+                .RunAsync(diagnosticsProgress, _appCancellation.Token)
+                .ConfigureAwait(true);
 
-            await settingsService.InitializeAsync(_appCancellation.Token).ConfigureAwait(true);
-            await loggingService.InitializeAsync(_appCancellation.Token).ConfigureAwait(true);
-            await automationEngine.InitializeAsync(_appCancellation.Token).ConfigureAwait(true);
+            if (!diagnosticsResult.Succeeded)
+            {
+                System.Windows.MessageBox.Show(
+                    diagnosticsResult.Summary,
+                    "Process Governor startup checks failed",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+                Shutdown(-1);
+                return;
+            }
 
             var mainViewModel = _provider.GetRequiredService<MainViewModel>();
-            await mainViewModel.InitializeAsync(_appCancellation.Token).ConfigureAwait(true);
-
             var window = _provider.GetRequiredService<MainWindow>();
             window.DataContext = mainViewModel;
+            MainWindow = window;
             _provider.GetRequiredService<INotificationService>().Attach(window);
 
+            var automationEngine = _provider.GetRequiredService<IAutomationEngine>();
+            var processMonitor = _provider.GetRequiredService<IProcessMonitorService>();
             await automationEngine.StartAsync(_appCancellation.Token).ConfigureAwait(true);
             await processMonitor.StartAsync(_appCancellation.Token).ConfigureAwait(true);
 
             window.Show();
+            ShutdownMode = ShutdownMode.OnMainWindowClose;
+            diagnosticsWindow.Close();
         }
         catch (Exception ex)
         {
+            WriteStartupCrashLog(ex);
             System.Windows.MessageBox.Show(ex.ToString(), "Process Governor failed to start", MessageBoxButton.OK, MessageBoxImage.Error);
             Shutdown(-1);
         }
@@ -65,5 +82,24 @@ public partial class App : System.Windows.Application
 
         _appCancellation?.Dispose();
         base.OnExit(e);
+    }
+
+    private static void WriteStartupCrashLog(Exception exception)
+    {
+        try
+        {
+            var root = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "ProcessGovernor",
+                "logs");
+            Directory.CreateDirectory(root);
+            File.WriteAllText(
+                Path.Combine(root, "startup-crash.txt"),
+                $"TimestampUtc: {DateTimeOffset.UtcNow:O}{Environment.NewLine}{exception}");
+        }
+        catch
+        {
+            // Crash logging is best-effort; startup should still surface the original exception.
+        }
     }
 }

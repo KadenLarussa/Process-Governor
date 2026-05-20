@@ -79,7 +79,7 @@ public sealed class ProfilesViewModel : ObservableObject
     {
         _store = await _rulePersistenceService.LoadAsync(cancellationToken).ConfigureAwait(false);
         var selectedProfileId = SelectedProfile?.Id;
-        await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+        await UiDispatch.InvokeAsync(() =>
         {
             Profiles.Clear();
             foreach (var profile in _store.Profiles.OrderBy(static profile => profile.PriorityOrder).ThenBy(static profile => profile.Name))
@@ -113,7 +113,7 @@ public sealed class ProfilesViewModel : ObservableObject
 
         var selected = SelectedProfile;
         _store.Profiles.RemoveAll(profile => profile.Id == selected.Id);
-        await System.Windows.Application.Current.Dispatcher.InvokeAsync(() => Profiles.Remove(selected));
+        await UiDispatch.InvokeAsync(() => Profiles.Remove(selected));
         SelectedProfile = null;
         await SaveAsync(cancellationToken).ConfigureAwait(false);
     }

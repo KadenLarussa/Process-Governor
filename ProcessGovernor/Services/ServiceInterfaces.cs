@@ -47,6 +47,8 @@ public interface IProcessMonitorService
 
     Task StopAsync();
 
+    Task<ProcessSnapshotBatch> CaptureOnceAsync(CancellationToken cancellationToken);
+
     void ApplySettings(AppSettings settings);
 
     void SetWindowMinimized(bool isMinimized);
@@ -97,6 +99,11 @@ public interface IRuleEvaluationService
 public interface IStartupRegistrationService
 {
     Task<ProcessActionResult> SetEnabledAsync(bool enabled, CancellationToken cancellationToken);
+}
+
+public interface IStartupDiagnosticsService
+{
+    Task<StartupDiagnosticsResult> RunAsync(IProgress<StartupCheckUpdate> progress, CancellationToken cancellationToken);
 }
 
 public interface IAutomationEngine

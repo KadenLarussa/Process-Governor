@@ -71,7 +71,9 @@ public sealed class AppServiceProvider : IServiceProvider, IDisposable
 
         if (!_descriptors.TryGetValue(serviceType, out var descriptor))
         {
-            if (serviceType.IsClass && !serviceType.IsAbstract)
+            if (serviceType.IsClass
+                && !serviceType.IsAbstract
+                && serviceType.Namespace?.StartsWith(nameof(ProcessGovernor), StringComparison.Ordinal) == true)
             {
                 return CreateInstance(serviceType);
             }
@@ -108,6 +110,11 @@ public sealed class AppServiceProvider : IServiceProvider, IDisposable
 
         foreach (var instance in _singletons.Values.OfType<IDisposable>())
         {
+            if (ReferenceEquals(instance, this))
+            {
+                continue;
+            }
+
             instance.Dispose();
         }
 

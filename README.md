@@ -73,6 +73,12 @@ Run from source:
 dotnet run --project .\ProcessGovernor\ProcessGovernor.csproj
 ```
 
+Run the local functionality harness:
+
+```powershell
+dotnet run --project .\ProcessGovernor.TestHarness\ProcessGovernor.TestHarness.csproj
+```
+
 Publish a self-contained folder build:
 
 ```powershell
@@ -105,5 +111,8 @@ Important services:
 - `ElevationService`
 - `LoggingService`
 - `StartupRegistrationService`
+- `StartupDiagnosticsService`
 
 The app avoids WMI polling for core process monitoring. CPU and memory summary metrics use small Win32 P/Invoke calls, summary GPU uses PDH when the Windows counter is available, and per-process data comes from `System.Diagnostics.Process`. Access denied and race conditions from short-lived processes are handled gracefully.
+
+The startup diagnostics window runs local readiness checks before the main UI opens. See [docs/startup-diagnostics-test-plan.md](docs/startup-diagnostics-test-plan.md) for the analysis and smoke-test plan.

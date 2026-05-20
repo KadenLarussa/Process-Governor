@@ -101,7 +101,7 @@ public sealed class DashboardViewModel : ObservableObject
 
     private void OnSnapshotUpdated(object? sender, ProcessSnapshotBatch batch)
     {
-        System.Windows.Application.Current.Dispatcher.InvokeAsync(() => ApplySnapshot(batch));
+        _ = UiDispatch.InvokeAsync(() => ApplySnapshot(batch));
     }
 
     private void ApplySnapshot(ProcessSnapshotBatch batch)
@@ -174,7 +174,7 @@ public sealed class DashboardViewModel : ObservableObject
         var result = await _processActionService.KillAsync(process.ProcessId, entireTree, force, cancellationToken).ConfigureAwait(false);
         if (!result.Succeeded)
         {
-            System.Windows.Application.Current.Dispatcher.Invoke(() => _dialogService.ShowError("Process Action Failed", result.Message));
+            UiDispatch.Invoke(() => _dialogService.ShowError("Process Action Failed", result.Message));
         }
     }
 
@@ -188,7 +188,7 @@ public sealed class DashboardViewModel : ObservableObject
         var result = await _processActionService.SetPriorityAsync(process.ProcessId, priority, cancellationToken).ConfigureAwait(false);
         if (!result.Succeeded)
         {
-            System.Windows.Application.Current.Dispatcher.Invoke(() => _dialogService.ShowError("Priority Change Failed", result.Message));
+            UiDispatch.Invoke(() => _dialogService.ShowError("Priority Change Failed", result.Message));
         }
     }
 
@@ -202,7 +202,7 @@ public sealed class DashboardViewModel : ObservableObject
         var result = await _processActionService.SetCpuAffinityAsync(process.ProcessId, affinityMask, cancellationToken).ConfigureAwait(false);
         if (!result.Succeeded)
         {
-            System.Windows.Application.Current.Dispatcher.Invoke(() => _dialogService.ShowError("CPU Affinity Failed", result.Message));
+            UiDispatch.Invoke(() => _dialogService.ShowError("CPU Affinity Failed", result.Message));
         }
     }
 
@@ -228,7 +228,7 @@ public sealed class DashboardViewModel : ObservableObject
         var result = await _processActionService.SuspendAsync(process.ProcessId, force, cancellationToken).ConfigureAwait(false);
         if (!result.Succeeded)
         {
-            System.Windows.Application.Current.Dispatcher.Invoke(() => _dialogService.ShowError("Suspend Failed", result.Message));
+            UiDispatch.Invoke(() => _dialogService.ShowError("Suspend Failed", result.Message));
         }
     }
 
@@ -242,7 +242,7 @@ public sealed class DashboardViewModel : ObservableObject
         var result = await _processActionService.ResumeAsync(process.ProcessId, cancellationToken).ConfigureAwait(false);
         if (!result.Succeeded)
         {
-            System.Windows.Application.Current.Dispatcher.Invoke(() => _dialogService.ShowError("Resume Failed", result.Message));
+            UiDispatch.Invoke(() => _dialogService.ShowError("Resume Failed", result.Message));
         }
     }
 
@@ -256,7 +256,7 @@ public sealed class DashboardViewModel : ObservableObject
         var result = await _processActionService.OpenFileLocationAsync(process.ExecutablePath, cancellationToken).ConfigureAwait(false);
         if (!result.Succeeded)
         {
-            System.Windows.Application.Current.Dispatcher.Invoke(() => _dialogService.ShowWarning("Open File Location", result.Message));
+            UiDispatch.Invoke(() => _dialogService.ShowWarning("Open File Location", result.Message));
         }
     }
 
@@ -270,7 +270,7 @@ public sealed class DashboardViewModel : ObservableObject
         var result = await _processActionService.CopyPathAsync(process.ExecutablePath, cancellationToken).ConfigureAwait(false);
         if (!result.Succeeded)
         {
-            System.Windows.Application.Current.Dispatcher.Invoke(() => _dialogService.ShowWarning("Copy Path", result.Message));
+            UiDispatch.Invoke(() => _dialogService.ShowWarning("Copy Path", result.Message));
         }
     }
 
