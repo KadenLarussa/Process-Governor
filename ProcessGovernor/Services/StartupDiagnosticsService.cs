@@ -23,6 +23,7 @@ public sealed class StartupDiagnosticsService : IStartupDiagnosticsService
 
     private readonly AppPaths _paths;
     private readonly ISettingsService _settingsService;
+    private readonly IThemeService _themeService;
     private readonly ILoggingService _loggingService;
     private readonly IRulePersistenceService _rulePersistenceService;
     private readonly IAutomationEngine _automationEngine;
@@ -35,6 +36,7 @@ public sealed class StartupDiagnosticsService : IStartupDiagnosticsService
     public StartupDiagnosticsService(
         AppPaths paths,
         ISettingsService settingsService,
+        IThemeService themeService,
         ILoggingService loggingService,
         IRulePersistenceService rulePersistenceService,
         IAutomationEngine automationEngine,
@@ -45,6 +47,7 @@ public sealed class StartupDiagnosticsService : IStartupDiagnosticsService
     {
         _paths = paths;
         _settingsService = settingsService;
+        _themeService = themeService;
         _loggingService = loggingService;
         _rulePersistenceService = rulePersistenceService;
         _automationEngine = automationEngine;
@@ -166,6 +169,7 @@ public sealed class StartupDiagnosticsService : IStartupDiagnosticsService
     {
         await _settingsService.InitializeAsync(cancellationToken).ConfigureAwait(false);
         var settings = _settingsService.Current;
+        _themeService.Apply(settings);
 
         if (settings.RefreshIntervalMs < 500 || settings.MinimizedRefreshIntervalMs < 1000)
         {

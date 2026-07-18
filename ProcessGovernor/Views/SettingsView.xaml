@@ -19,100 +19,129 @@
             <StackPanel>
                 <Border Style="{StaticResource CardBorder}" Margin="0,0,0,14">
                     <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="220" />
                             <ColumnDefinition Width="220" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
-                        <StackPanel Grid.Column="0" Margin="0,0,14,0">
-                            <TextBlock Text="Refresh interval ms" Foreground="{StaticResource MutedTextBrush}" />
-                            <TextBox Text="{Binding RefreshIntervalMs, UpdateSourceTrigger=PropertyChanged}" Margin="0,5,0,0" />
+                        <TextBlock Grid.Row="0" Grid.ColumnSpan="3" Text="Monitoring cadence" Style="{StaticResource SectionTitle}" />
+                        <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,14,0">
+                            <TextBlock Text="Active refresh (milliseconds)" Style="{StaticResource FieldLabel}" />
+                            <TextBox Text="{Binding RefreshIntervalMs, UpdateSourceTrigger=PropertyChanged}" ToolTip="How often process metrics update while the window is open. Minimum: 500 ms." />
                         </StackPanel>
-                        <StackPanel Grid.Column="1" Margin="0,0,14,0">
-                            <TextBlock Text="Minimized interval ms" Foreground="{StaticResource MutedTextBrush}" />
-                            <TextBox Text="{Binding MinimizedRefreshIntervalMs, UpdateSourceTrigger=PropertyChanged}" Margin="0,5,0,0" />
+                        <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,0,14,0">
+                            <TextBlock Text="Minimized refresh (milliseconds)" Style="{StaticResource FieldLabel}" />
+                            <TextBox Text="{Binding MinimizedRefreshIntervalMs, UpdateSourceTrigger=PropertyChanged}" ToolTip="A slower refresh while minimized reduces background work. Minimum: 1000 ms." />
                         </StackPanel>
-                        <StackPanel Grid.Column="2">
-                            <TextBlock Text="Max log entries" Foreground="{StaticResource MutedTextBrush}" />
-                            <TextBox Text="{Binding MaxLogEntries, UpdateSourceTrigger=PropertyChanged}" Margin="0,5,0,0" />
+                        <StackPanel Grid.Row="1" Grid.Column="2">
+                            <TextBlock Text="Log history limit" Style="{StaticResource FieldLabel}" />
+                            <TextBox Text="{Binding MaxLogEntries, UpdateSourceTrigger=PropertyChanged}" ToolTip="Maximum local log entries retained before older entries are removed." />
                         </StackPanel>
                     </Grid>
                 </Border>
 
                 <Border Style="{StaticResource CardBorder}" Margin="0,0,0,14">
-                    <WrapPanel>
-                        <ToggleButton Style="{StaticResource OptionToggleButton}" IsChecked="{Binding MinimizeToTray}" Margin="0,0,8,8">
-                            <StackPanel>
-                                <TextBlock Text="Minimize to tray" FontWeight="SemiBold" />
-                                <TextBlock Text="{Binding MinimizeToTray, Converter={StaticResource BoolLabelConverter}, ConverterParameter=On/Off}" FontSize="11" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
-                            </StackPanel>
-                        </ToggleButton>
-                        <ToggleButton Style="{StaticResource OptionToggleButton}" IsChecked="{Binding CloseToTray}" Margin="0,0,8,8">
-                            <StackPanel>
-                                <TextBlock Text="Close to tray" FontWeight="SemiBold" />
-                                <TextBlock Text="{Binding CloseToTray, Converter={StaticResource BoolLabelConverter}, ConverterParameter=On/Off}" FontSize="11" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
-                            </StackPanel>
-                        </ToggleButton>
-                        <ToggleButton Style="{StaticResource OptionToggleButton}" IsChecked="{Binding StartWithWindows}" Margin="0,0,8,8" ToolTip="Writes or removes the current user Run key entry when settings are saved.">
-                            <StackPanel>
-                                <TextBlock Text="Start with Windows" FontWeight="SemiBold" />
-                                <TextBlock Text="{Binding StartWithWindows, Converter={StaticResource BoolLabelConverter}, ConverterParameter=On/Off}" FontSize="11" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
-                            </StackPanel>
-                        </ToggleButton>
-                        <ToggleButton Style="{StaticResource OptionToggleButton}" IsChecked="{Binding CompactMode}" Margin="0,0,8,8">
-                            <StackPanel>
-                                <TextBlock Text="Compact mode" FontWeight="SemiBold" />
-                                <TextBlock Text="{Binding CompactMode, Converter={StaticResource BoolLabelConverter}, ConverterParameter=On/Off}" FontSize="11" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
-                            </StackPanel>
-                        </ToggleButton>
-                        <ToggleButton Style="{StaticResource OptionToggleButton}" IsChecked="{Binding PauseMonitoringWhenMinimized}" Margin="0,0,8,8">
-                            <StackPanel>
-                                <TextBlock Text="Pause minimized" FontWeight="SemiBold" />
-                                <TextBlock Text="{Binding PauseMonitoringWhenMinimized, Converter={StaticResource BoolLabelConverter}, ConverterParameter=On/Off}" FontSize="11" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
-                            </StackPanel>
-                        </ToggleButton>
-                        <ToggleButton Style="{StaticResource OptionToggleButton}" IsChecked="{Binding SafeMode}" Margin="0,0,8,8">
-                            <StackPanel>
-                                <TextBlock Text="Safe mode" FontWeight="SemiBold" />
-                                <TextBlock Text="{Binding SafeMode, Converter={StaticResource BoolLabelConverter}, ConverterParameter=On/Off}" FontSize="11" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
-                            </StackPanel>
-                        </ToggleButton>
-                        <ToggleButton Style="{StaticResource OptionToggleButton}" IsChecked="{Binding EnableNotifications}" Margin="0,0,8,8">
-                            <StackPanel>
-                                <TextBlock Text="Notifications" FontWeight="SemiBold" />
-                                <TextBlock Text="{Binding EnableNotifications, Converter={StaticResource BoolLabelConverter}, ConverterParameter=On/Off}" FontSize="11" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
-                            </StackPanel>
-                        </ToggleButton>
-                        <ToggleButton Style="{StaticResource OptionToggleButton}" IsChecked="{Binding AutomaticRollbackProtection}" Margin="0,0,8,8">
-                            <StackPanel>
-                                <TextBlock Text="Rollback protection" FontWeight="SemiBold" />
-                                <TextBlock Text="{Binding AutomaticRollbackProtection, Converter={StaticResource BoolLabelConverter}, ConverterParameter=On/Off}" FontSize="11" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
-                            </StackPanel>
-                        </ToggleButton>
-                    </WrapPanel>
+                    <StackPanel>
+                        <TextBlock Text="Behavior and safety" Style="{StaticResource SectionTitle}" />
+                        <WrapPanel>
+                            <ToggleButton Style="{StaticResource OptionToggleButton}" IsChecked="{Binding MinimizeToTray}" Margin="0,0,8,8" ToolTip="Keep Process Governor available in the notification area when minimized.">
+                                <StackPanel>
+                                    <TextBlock Text="Minimize to tray" FontWeight="SemiBold" />
+                                    <TextBlock Text="{Binding MinimizeToTray, Converter={StaticResource BoolLabelConverter}, ConverterParameter=On/Off}" FontSize="11" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
+                                </StackPanel>
+                            </ToggleButton>
+                            <ToggleButton Style="{StaticResource OptionToggleButton}" IsChecked="{Binding CloseToTray}" Margin="0,0,8,8" ToolTip="The window's close button hides the app instead of stopping automation.">
+                                <StackPanel>
+                                    <TextBlock Text="Close to tray" FontWeight="SemiBold" />
+                                    <TextBlock Text="{Binding CloseToTray, Converter={StaticResource BoolLabelConverter}, ConverterParameter=On/Off}" FontSize="11" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
+                                </StackPanel>
+                            </ToggleButton>
+                            <ToggleButton Style="{StaticResource OptionToggleButton}" IsChecked="{Binding StartWithWindows}" Margin="0,0,8,8" ToolTip="Launch Process Governor automatically after you sign in to Windows.">
+                                <StackPanel>
+                                    <TextBlock Text="Start with Windows" FontWeight="SemiBold" />
+                                    <TextBlock Text="{Binding StartWithWindows, Converter={StaticResource BoolLabelConverter}, ConverterParameter=On/Off}" FontSize="11" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
+                                </StackPanel>
+                            </ToggleButton>
+                            <ToggleButton Style="{StaticResource OptionToggleButton}" IsChecked="{Binding CompactMode}" Margin="0,0,8,8" ToolTip="Reduce spacing and text size to fit more information on screen.">
+                                <StackPanel>
+                                    <TextBlock Text="Compact mode" FontWeight="SemiBold" />
+                                    <TextBlock Text="{Binding CompactMode, Converter={StaticResource BoolLabelConverter}, ConverterParameter=On/Off}" FontSize="11" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
+                                </StackPanel>
+                            </ToggleButton>
+                            <ToggleButton Style="{StaticResource OptionToggleButton}" IsChecked="{Binding PauseMonitoringWhenMinimized}" Margin="0,0,8,8" ToolTip="Stop process polling while minimized for the lowest possible idle overhead.">
+                                <StackPanel>
+                                    <TextBlock Text="Pause minimized" FontWeight="SemiBold" />
+                                    <TextBlock Text="{Binding PauseMonitoringWhenMinimized, Converter={StaticResource BoolLabelConverter}, ConverterParameter=On/Off}" FontSize="11" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
+                                </StackPanel>
+                            </ToggleButton>
+                            <ToggleButton Style="{StaticResource OptionToggleButton}" IsChecked="{Binding SafeMode}" Margin="0,0,8,8" ToolTip="Require extra confirmation around protected and system processes.">
+                                <StackPanel>
+                                    <TextBlock Text="Safe mode" FontWeight="SemiBold" />
+                                    <TextBlock Text="{Binding SafeMode, Converter={StaticResource BoolLabelConverter}, ConverterParameter=On/Off}" FontSize="11" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
+                                </StackPanel>
+                            </ToggleButton>
+                            <ToggleButton Style="{StaticResource OptionToggleButton}" IsChecked="{Binding EnableNotifications}" Margin="0,0,8,8" ToolTip="Allow local notifications for automation events and important warnings.">
+                                <StackPanel>
+                                    <TextBlock Text="Notifications" FontWeight="SemiBold" />
+                                    <TextBlock Text="{Binding EnableNotifications, Converter={StaticResource BoolLabelConverter}, ConverterParameter=On/Off}" FontSize="11" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
+                                </StackPanel>
+                            </ToggleButton>
+                            <ToggleButton Style="{StaticResource OptionToggleButton}" IsChecked="{Binding AutomaticRollbackProtection}" Margin="0,0,8,8" ToolTip="Restore captured priority, affinity, and power-plan values when reversible rules end.">
+                                <StackPanel>
+                                    <TextBlock Text="Rollback protection" FontWeight="SemiBold" />
+                                    <TextBlock Text="{Binding AutomaticRollbackProtection, Converter={StaticResource BoolLabelConverter}, ConverterParameter=On/Off}" FontSize="11" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
+                                </StackPanel>
+                            </ToggleButton>
+                        </WrapPanel>
+                    </StackPanel>
                 </Border>
 
                 <Border Style="{StaticResource CardBorder}" Margin="0,0,0,14">
                     <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="220" />
                             <ColumnDefinition Width="220" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
-                        <StackPanel Grid.Column="0" Margin="0,0,14,0">
-                            <TextBlock Text="Theme" Foreground="{StaticResource MutedTextBrush}" />
-                            <TextBox Text="{Binding Theme, UpdateSourceTrigger=PropertyChanged}" Margin="0,5,0,0" />
+                        <TextBlock Grid.Row="0" Grid.ColumnSpan="3" Text="Appearance" Style="{StaticResource SectionTitle}" />
+                        <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,14,0">
+                            <TextBlock Text="Theme" Style="{StaticResource FieldLabel}" />
+                            <TextBox Text="{Binding Theme}" IsReadOnly="True" ToolTip="Process Governor currently ships one carefully tuned dark theme." />
                         </StackPanel>
-                        <StackPanel Grid.Column="1" Margin="0,0,14,0">
-                            <TextBlock Text="Accent color" Foreground="{StaticResource MutedTextBrush}" />
-                            <TextBox Text="{Binding AccentColor, UpdateSourceTrigger=PropertyChanged}" Margin="0,5,0,0" />
-                        </StackPanel>
-                        <Button Grid.Column="2"
+                        <Grid Grid.Row="1" Grid.Column="1" Margin="0,0,14,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="42" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="Accent color" Style="{StaticResource FieldLabel}" />
+                                <TextBox Text="{Binding AccentColor, UpdateSourceTrigger=PropertyChanged}" ToolTip="Enter a hex color such as #70B7FF, then save to apply it across the app." />
+                            </StackPanel>
+                            <Border Grid.Column="1"
+                                    Width="32"
+                                    Height="32"
+                                    Margin="10,18,0,0"
+                                    Background="{Binding AccentColor, Converter={StaticResource HexColorBrushConverter}}"
+                                    BorderBrush="{StaticResource BorderBrushStrong}"
+                                    BorderThickness="1"
+                                    CornerRadius="6"
+                                    ToolTip="Accent preview" />
+                        </Grid>
+                        <Button Grid.Row="1"
+                                Grid.Column="2"
                                 Content="Save Settings"
                                 Style="{StaticResource AccentButton}"
                                 Command="{Binding SaveCommand}"
                                 HorizontalAlignment="Left"
-                                Margin="0,19,0,0" />
+                                VerticalAlignment="Bottom" />
                     </Grid>
                 </Border>
             </StackPanel>

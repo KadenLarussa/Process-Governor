@@ -4,82 +4,254 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d">
+    <UserControl.Resources>
+        <Style x:Key="SummaryLabel" TargetType="{x:Type TextBlock}">
+            <Setter Property="Foreground" Value="{StaticResource MutedTextBrush}" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="0,0,0,5" />
+        </Style>
+
+        <Style x:Key="SummarySegment" TargetType="{x:Type Border}">
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrushSoft}" />
+            <Setter Property="BorderThickness" Value="0,0,1,0" />
+            <Setter Property="Padding" Value="18,13" />
+        </Style>
+
+        <Style x:Key="InspectorLabel" TargetType="{x:Type TextBlock}">
+            <Setter Property="Foreground" Value="{StaticResource MutedTextBrush}" />
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="0,0,0,3" />
+        </Style>
+
+        <Style x:Key="DashboardRowStyle"
+               TargetType="{x:Type DataGridRow}"
+               BasedOn="{StaticResource {x:Type DataGridRow}}">
+            <EventSetter Event="PreviewMouseRightButtonDown" Handler="DataGridRow_PreviewMouseRightButtonDown" />
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{StaticResource PanelRaisedBrush}" />
+                </Trigger>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <Grid Grid.Row="0" Margin="0,0,0,16">
+        <Grid Grid.Row="0" Margin="0,0,0,14">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel>
+                <TextBlock Text="Dashboard" Style="{StaticResource PageTitle}" />
+                <TextBlock Text="Live process activity" Style="{StaticResource MutedText}" />
+            </StackPanel>
+
+            <StackPanel Grid.Column="1"
+                        Orientation="Horizontal"
+                        VerticalAlignment="Center">
+                <StackPanel>
+                    <TextBlock Text="PROCESSES" Style="{StaticResource SummaryLabel}" HorizontalAlignment="Right" />
+                    <TextBlock Text="{Binding Summary.ProcessCount}"
+                               FontSize="17"
+                               FontWeight="SemiBold"
+                               HorizontalAlignment="Right" />
+                </StackPanel>
+                <Border Width="1"
+                        Height="34"
+                        Background="{StaticResource BorderBrushSoft}"
+                        Margin="18,0" />
+                <StackPanel MinWidth="70">
+                    <TextBlock Text="UPTIME" Style="{StaticResource SummaryLabel}" />
+                    <TextBlock Text="{Binding Summary.UptimeDisplay}"
+                               FontSize="17"
+                               FontWeight="SemiBold" />
+                </StackPanel>
+            </StackPanel>
+        </Grid>
+
+        <Border Grid.Row="1"
+                Background="{StaticResource PanelAltBrush}"
+                BorderBrush="{StaticResource BorderBrushSoft}"
+                BorderThickness="1"
+                CornerRadius="8"
+                Margin="0,0,0,16">
+            <UniformGrid Columns="4">
+                <Border Style="{StaticResource SummarySegment}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Text="CPU" Style="{StaticResource SummaryLabel}" />
+                        <TextBlock Grid.Row="1"
+                                   Text="{Binding Summary.CpuDisplay}"
+                                   Foreground="{Binding Summary.CpuUsagePercent, Converter={StaticResource UsageHeatBrushConverter}}"
+                                   FontSize="24"
+                                   FontWeight="SemiBold" />
+                        <ProgressBar Grid.Row="2"
+                                     Value="{Binding Summary.CpuUsagePercent, Mode=OneWay}"
+                                     Maximum="100"
+                                     Height="3"
+                                     Margin="0,8,0,0"
+                                     Foreground="{Binding Summary.CpuUsagePercent, Converter={StaticResource UsageHeatBrushConverter}}"
+                                     Style="{StaticResource AccentProgressBar}" />
+                    </Grid>
+                </Border>
+
+                <Border Style="{StaticResource SummarySegment}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Text="MEMORY" Style="{StaticResource SummaryLabel}" />
+                        <TextBlock Grid.Row="1"
+                                   Text="{Binding Summary.MemoryDisplay}"
+                                   Foreground="{Binding Summary.MemoryUsagePercent, Converter={StaticResource UsageHeatBrushConverter}}"
+                                   FontSize="24"
+                                   FontWeight="SemiBold" />
+                        <TextBlock Grid.Row="2"
+                                   Text="{Binding Summary.MemoryDetail}"
+                                   Foreground="{StaticResource MutedTextBrush}"
+                                   FontSize="11"
+                                   Margin="0,5,0,0"
+                                   TextTrimming="CharacterEllipsis" />
+                    </Grid>
+                </Border>
+
+                <Border Style="{StaticResource SummarySegment}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Text="DISK ACTIVITY" Style="{StaticResource SummaryLabel}" />
+                        <TextBlock Grid.Row="1"
+                                   Text="{Binding Summary.DiskActivity}"
+                                   Foreground="{Binding Summary.DiskBytesPerSecond, Converter={StaticResource UsageHeatBrushConverter}, ConverterParameter=Throughput}"
+                                   FontSize="20"
+                                   FontWeight="SemiBold" />
+                        <TextBlock Grid.Row="2"
+                                   Text="{Binding Summary.DiskDetail}"
+                                   Foreground="{StaticResource MutedTextBrush}"
+                                   FontSize="11"
+                                   Margin="0,5,0,0"
+                                   TextTrimming="CharacterEllipsis" />
+                    </Grid>
+                </Border>
+
+                <Border Padding="18,13">
+                    <Grid ToolTip="{Binding Summary.GpuDetail}">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Text="GPU" Style="{StaticResource SummaryLabel}" />
+                        <TextBlock Grid.Row="1"
+                                   Text="{Binding Summary.GpuUsage}"
+                                   Foreground="{Binding Summary.GpuUsagePercent, Converter={StaticResource UsageHeatBrushConverter}}"
+                                   FontSize="24"
+                                   FontWeight="SemiBold" />
+                        <TextBlock Grid.Row="2"
+                                   Text="{Binding Summary.GpuEngine}"
+                                   Foreground="{Binding Summary.GpuEngine, Converter={StaticResource GpuEngineBrushConverter}}"
+                                   FontSize="11"
+                                   FontWeight="SemiBold"
+                                   Margin="0,5,0,0" />
+                    </Grid>
+                </Border>
+            </UniformGrid>
+        </Border>
+
+        <Grid Grid.Row="2" Margin="0,0,0,8">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="330" />
             </Grid.ColumnDefinitions>
-            <StackPanel>
-                <TextBlock Text="Dashboard" Style="{StaticResource PageTitle}" />
-                <TextBlock Text="Live process view with safe actions and low-overhead refresh." Style="{StaticResource MutedText}" />
-            </StackPanel>
-            <StackPanel Grid.Column="1">
-                <TextBlock Text="Search" Foreground="{StaticResource MutedTextBrush}" Margin="0,0,0,5" />
-                <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" />
-            </StackPanel>
+
+            <TextBlock Text="Processes"
+                       FontSize="16"
+                       FontWeight="SemiBold"
+                       VerticalAlignment="Center" />
+
+            <Grid Grid.Column="1">
+                <TextBox x:Name="ProcessSearch"
+                         Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                         Padding="34,7,38,7"
+                         ToolTip="Filter by process name, PID, or executable path." />
+                <TextBlock Text="&#xE721;"
+                           FontFamily="Segoe Fluent Icons"
+                           Foreground="{StaticResource MutedTextBrush}"
+                           FontSize="14"
+                           HorizontalAlignment="Left"
+                           VerticalAlignment="Center"
+                           Margin="12,0,0,0"
+                           IsHitTestVisible="False" />
+                <TextBlock Text="Search processes"
+                           Foreground="{StaticResource MutedTextBrush}"
+                           VerticalAlignment="Center"
+                           Margin="34,0,40,0"
+                           IsHitTestVisible="False">
+                    <TextBlock.Style>
+                        <Style TargetType="{x:Type TextBlock}">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Text, ElementName=ProcessSearch}" Value="">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+                <Button Content="&#xE711;"
+                        Style="{StaticResource IconButton}"
+                        Command="{Binding ClearSearchCommand}"
+                        Width="30"
+                        Height="30"
+                        MinHeight="30"
+                        Padding="0"
+                        Margin="0,0,4,0"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Center"
+                        ToolTip="Clear search" />
+            </Grid>
         </Grid>
 
-        <UniformGrid Grid.Row="1" Columns="6" Margin="0,0,0,10">
-            <Border Style="{StaticResource CardBorder}">
-                <StackPanel>
-                    <TextBlock Text="CPU" Style="{StaticResource MutedText}" />
-                    <TextBlock Text="{Binding Summary.CpuDisplay}" FontSize="22" FontWeight="SemiBold" />
-                </StackPanel>
-            </Border>
-            <Border Style="{StaticResource CardBorder}">
-                <StackPanel>
-                    <TextBlock Text="RAM" Style="{StaticResource MutedText}" />
-                    <TextBlock Text="{Binding Summary.MemoryDisplay}" FontSize="22" FontWeight="SemiBold" />
-                    <TextBlock Text="{Binding Summary.MemoryDetail}" Foreground="{StaticResource MutedTextBrush}" FontSize="11" />
-                </StackPanel>
-            </Border>
-            <Border Style="{StaticResource CardBorder}">
-                <StackPanel>
-                    <TextBlock Text="Disk" Style="{StaticResource MutedText}" />
-                    <TextBlock Text="{Binding Summary.DiskActivity}" FontSize="18" FontWeight="SemiBold" />
-                </StackPanel>
-            </Border>
-            <Border Style="{StaticResource CardBorder}">
-                <StackPanel>
-                    <TextBlock Text="GPU" Style="{StaticResource MutedText}" />
-                    <TextBlock Text="{Binding Summary.GpuUsage}" FontSize="18" FontWeight="SemiBold" />
-                </StackPanel>
-            </Border>
-            <Border Style="{StaticResource CardBorder}">
-                <StackPanel>
-                    <TextBlock Text="Processes" Style="{StaticResource MutedText}" />
-                    <TextBlock Text="{Binding Summary.ProcessCount}" FontSize="22" FontWeight="SemiBold" />
-                </StackPanel>
-            </Border>
-            <Border Style="{StaticResource CardBorder}">
-                <StackPanel>
-                    <TextBlock Text="Uptime" Style="{StaticResource MutedText}" />
-                    <TextBlock Text="{Binding Summary.UptimeDisplay}" FontSize="22" FontWeight="SemiBold" />
-                </StackPanel>
-            </Border>
-        </UniformGrid>
-
-        <DataGrid Grid.Row="2"
+        <DataGrid x:Name="ProcessGrid"
+                  Grid.Row="3"
                   ItemsSource="{Binding ProcessesView}"
+                  SelectedItem="{Binding SelectedProcess, Mode=TwoWay}"
+                  SelectionChanged="ProcessGrid_SelectionChanged"
                   AutoGenerateColumns="False"
                   IsReadOnly="True"
+                  FrozenColumnCount="1"
+                  RowHeight="54"
+                  ColumnHeaderHeight="38"
                   SelectionMode="Extended"
                   SelectionUnit="FullRow"
+                  RowStyle="{StaticResource DashboardRowStyle}"
                   VirtualizingPanel.IsVirtualizing="True"
                   VirtualizingPanel.VirtualizationMode="Recycling"
-                  ScrollViewer.CanContentScroll="True">
-            <DataGrid.RowStyle>
-                <Style TargetType="{x:Type DataGridRow}" BasedOn="{StaticResource {x:Type DataGridRow}}">
-                    <EventSetter Event="PreviewMouseRightButtonDown" Handler="DataGridRow_PreviewMouseRightButtonDown" />
-                </Style>
-            </DataGrid.RowStyle>
+                  ScrollViewer.CanContentScroll="True"
+                  ScrollViewer.HorizontalScrollBarVisibility="Auto">
             <DataGrid.ContextMenu>
                 <ContextMenu>
                     <MenuItem Header="Kill Process"
@@ -133,37 +305,239 @@
                               CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
                 </ContextMenu>
             </DataGrid.ContextMenu>
+
             <DataGrid.Columns>
-                <DataGridTemplateColumn Header="Process" SortMemberPath="Name" Width="220">
+                <DataGridTemplateColumn Header="Process" SortMemberPath="Name" Width="*" MinWidth="230">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
-                                <Border Background="#3B2F15"
-                                        BorderBrush="{StaticResource WarningBrush}"
-                                        BorderThickness="1"
-                                        CornerRadius="4"
-                                        Margin="8,0,0,0"
-                                        Padding="5,1"
-                                        Visibility="{Binding RequiresElevationForActions, Converter={StaticResource BoolToVisibilityConverter}}"
-                                        ToolTip="Some actions may require administrator elevation.">
-                                    <TextBlock Text="ADMIN" Foreground="{StaticResource WarningBrush}" FontSize="10" FontWeight="SemiBold" />
-                                </Border>
+                            <StackPanel ToolTip="{Binding ExecutablePathDisplay}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{Binding Name}"
+                                               FontWeight="SemiBold"
+                                               FontSize="13"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="&#xEA18;"
+                                               FontFamily="Segoe Fluent Icons"
+                                               Foreground="{StaticResource WarningBrush}"
+                                               FontSize="13"
+                                               Margin="7,0,0,0"
+                                               Visibility="{Binding RequiresElevationForActions, Converter={StaticResource BoolToVisibilityConverter}}"
+                                               ToolTip="Some actions may require administrator elevation." />
+                                </StackPanel>
+                                <TextBlock Foreground="{StaticResource MutedTextBrush}"
+                                           FontSize="11"
+                                           Margin="0,3,0,0">
+                                    <Run Text="PID " />
+                                    <Run Text="{Binding ProcessId, Mode=OneWay}" />
+                                </TextBlock>
                             </StackPanel>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTextColumn Header="PID" Binding="{Binding ProcessId}" Width="80" />
-                <DataGridTextColumn Header="CPU" Binding="{Binding CpuDisplay}" SortMemberPath="CpuUsagePercent" Width="90" />
-                <DataGridTextColumn Header="RAM" Binding="{Binding MemoryDisplay}" SortMemberPath="WorkingSetBytes" Width="110" />
-                <DataGridTextColumn Header="Disk" Binding="{Binding DiskUsage}" Width="105" />
-                <DataGridTextColumn Header="GPU" Binding="{Binding GpuUsage}" Width="105" />
-                <DataGridTextColumn Header="Priority" Binding="{Binding PriorityDisplay}" Width="115" />
-                <DataGridTextColumn Header="Affinity" Binding="{Binding AffinityDisplay}" Width="110" />
-                <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="100" />
-                <DataGridTextColumn Header="Start Time" Binding="{Binding StartTimeDisplay}" Width="165" />
-                <DataGridTextColumn Header="Executable Path" Binding="{Binding ExecutablePathDisplay}" Width="*" />
+
+                <DataGridTemplateColumn Header="CPU" SortMemberPath="CpuUsagePercent" Width="95">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Grid ToolTip="Measured CPU usage over the latest process sample.">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <TextBlock Text="{Binding CpuDisplay}"
+                                           Foreground="{Binding CpuUsagePercent, Converter={StaticResource UsageHeatBrushConverter}}"
+                                           FontWeight="SemiBold" />
+                                <ProgressBar Grid.Row="1"
+                                             Value="{Binding CpuUsagePercent, Mode=OneWay}"
+                                             Maximum="100"
+                                             Width="58"
+                                             Height="3"
+                                             HorizontalAlignment="Left"
+                                             Margin="0,5,0,0"
+                                             Foreground="{Binding CpuUsagePercent, Converter={StaticResource UsageHeatBrushConverter}}"
+                                             Style="{StaticResource AccentProgressBar}" />
+                            </Grid>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+                <DataGridTemplateColumn Header="Memory" SortMemberPath="WorkingSetBytes" Width="118">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding MemoryDisplay}"
+                                       Foreground="{StaticResource TextBrush}"
+                                       FontWeight="SemiBold"
+                                       ToolTip="Private working-set memory currently held by this process." />
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+                <DataGridTemplateColumn SortMemberPath="DiskBytesPerSecond" Width="170">
+                    <DataGridTemplateColumn.Header>
+                        <TextBlock Text="Disk" ToolTip="Measured read/write transfer and operation rates." />
+                    </DataGridTemplateColumn.Header>
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Grid ToolTip="{Binding DiskDetail}">
+                                <Grid x:Name="DiskMetrics">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="18" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="R" Foreground="{StaticResource ReadBrush}" FontWeight="SemiBold" />
+                                    <TextBlock Grid.Column="1" Text="{Binding DiskReadDisplay}" Foreground="{StaticResource ReadBrush}" />
+                                    <TextBlock Grid.Row="1" Text="W" Foreground="{StaticResource WriteBrush}" FontWeight="SemiBold" />
+                                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding DiskWriteDisplay}" Foreground="{StaticResource WriteBrush}" />
+                                </Grid>
+                                <TextBlock x:Name="DiskUnavailable"
+                                           Text="Unavailable"
+                                           Foreground="{StaticResource MutedTextBrush}"
+                                           VerticalAlignment="Center"
+                                           Visibility="Collapsed" />
+                            </Grid>
+                            <DataTemplate.Triggers>
+                                <DataTrigger Binding="{Binding HasDiskMetrics}" Value="False">
+                                    <Setter TargetName="DiskMetrics" Property="Visibility" Value="Collapsed" />
+                                    <Setter TargetName="DiskUnavailable" Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </DataTemplate.Triggers>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+                <DataGridTemplateColumn SortMemberPath="GpuUsagePercent" Width="125">
+                    <DataGridTemplateColumn.Header>
+                        <TextBlock Text="GPU" ToolTip="Highest measured per-process engine load. Hover a row for the engine breakdown." />
+                    </DataGridTemplateColumn.Header>
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <StackPanel ToolTip="{Binding GpuDetail}">
+                                <TextBlock Text="{Binding GpuUsage}"
+                                           Foreground="{Binding GpuUsagePercent, Converter={StaticResource UsageHeatBrushConverter}}"
+                                           FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding GpuEngineDisplay}"
+                                           Foreground="{Binding GpuEngine, Converter={StaticResource GpuEngineBrushConverter}}"
+                                           FontSize="11"
+                                           FontWeight="SemiBold"
+                                           Margin="0,2,0,0" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+                <DataGridTextColumn Header="Priority"
+                                    Binding="{Binding PriorityDisplay}"
+                                    SortMemberPath="Priority"
+                                    Width="120" />
+
+                <DataGridTemplateColumn Header="Status" SortMemberPath="Status" Width="110">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Border Width="7"
+                                        Height="7"
+                                        Background="{StaticResource SuccessBrush}"
+                                        CornerRadius="4"
+                                        Margin="0,0,7,0" />
+                                <TextBlock Text="{Binding Status}" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
             </DataGrid.Columns>
         </DataGrid>
+
+        <Border x:Name="ProcessInspector"
+                Grid.Row="4"
+                Style="{StaticResource InsetBorder}"
+                Background="{StaticResource PanelAltBrush}"
+                Padding="15,12"
+                Margin="0,10,0,0"
+                MinHeight="104"
+                RenderTransformOrigin="0.5,0.5">
+            <Border.RenderTransform>
+                <TranslateTransform x:Name="InspectorTranslate" />
+            </Border.RenderTransform>
+            <ContentControl Content="{Binding SelectedProcess}">
+                <ContentControl.ContentTemplate>
+                    <DataTemplate>
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel MinWidth="0">
+                                    <TextBlock Text="{Binding Name}"
+                                               FontSize="15"
+                                               FontWeight="SemiBold"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{Binding ExecutablePathDisplay}"
+                                               Foreground="{StaticResource MutedTextBrush}"
+                                               FontSize="11"
+                                               Margin="0,3,16,0"
+                                               TextTrimming="CharacterEllipsis"
+                                               ToolTip="{Binding ExecutablePathDisplay}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                    <Button Content="&#xE838;"
+                                            FontFamily="Segoe Fluent Icons"
+                                            Style="{StaticResource IconButton}"
+                                            Command="{Binding DataContext.OpenFileLocationCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            CommandParameter="{Binding}"
+                                            Margin="0,0,6,0"
+                                            ToolTip="Open file location" />
+                                    <Button Content="&#xE8C8;"
+                                            FontFamily="Segoe Fluent Icons"
+                                            Style="{StaticResource IconButton}"
+                                            Command="{Binding DataContext.CopyPathCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            CommandParameter="{Binding}"
+                                            ToolTip="Copy executable path" />
+                                </StackPanel>
+                            </Grid>
+
+                            <UniformGrid Grid.Row="1" Columns="5" Margin="0,11,0,0">
+                                <StackPanel>
+                                    <TextBlock Text="PID" Style="{StaticResource InspectorLabel}" />
+                                    <TextBlock Text="{Binding ProcessId}" FontWeight="SemiBold" />
+                                </StackPanel>
+                                <StackPanel>
+                                    <TextBlock Text="PRIORITY" Style="{StaticResource InspectorLabel}" />
+                                    <TextBlock Text="{Binding PriorityDisplay}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                                <StackPanel>
+                                    <TextBlock Text="AFFINITY" Style="{StaticResource InspectorLabel}" />
+                                    <TextBlock Text="{Binding AffinityDisplay}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                                <StackPanel>
+                                    <TextBlock Text="STARTED" Style="{StaticResource InspectorLabel}" />
+                                    <TextBlock Text="{Binding StartTimeDisplay}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                                <StackPanel>
+                                    <TextBlock Text="STATUS" Style="{StaticResource InspectorLabel}" />
+                                    <StackPanel Orientation="Horizontal">
+                                        <Border Width="7"
+                                                Height="7"
+                                                Background="{StaticResource SuccessBrush}"
+                                                CornerRadius="4"
+                                                Margin="0,0,7,0"
+                                                VerticalAlignment="Center" />
+                                        <TextBlock Text="{Binding Status}" FontWeight="SemiBold" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </UniformGrid>
+                        </Grid>
+                    </DataTemplate>
+                </ContentControl.ContentTemplate>
+            </ContentControl>
+        </Border>
     </Grid>
 </UserControl>

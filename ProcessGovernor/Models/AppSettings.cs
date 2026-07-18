@@ -26,9 +26,9 @@ public sealed class AppSettings
 
     public bool AutomaticRollbackProtection { get; set; } = true;
 
-    public string Theme { get; set; } = "Dark";
+    public string Theme { get; set; } = "Soft Graphite";
 
-    public string AccentColor { get; set; } = "#4CC2FF";
+    public string AccentColor { get; set; } = "#70B7FF";
 
     public int MaxLogEntries { get; set; } = AppConstants.MaxRecentLogs;
 }

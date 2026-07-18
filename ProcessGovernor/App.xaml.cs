@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Threading;
 using ProcessGovernor.Core;
 using ProcessGovernor.Infrastructure;
 using ProcessGovernor.Services;
@@ -15,6 +16,9 @@ public partial class App : System.Windows.Application
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        DispatcherUnhandledException += OnDispatcherUnhandledException;
+        AppDomain.CurrentDomain.UnhandledException += OnDomainUnhandledException;
+        TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
         _appCancellation = new CancellationTokenSource();
@@ -60,7 +64,7 @@ public partial class App : System.Windows.Application
         }
         catch (Exception ex)
         {
-            WriteStartupCrashLog(ex);
+            WriteCrashLog("startup-crash.txt", ex);
             System.Windows.MessageBox.Show(ex.ToString(), "Process Governor failed to start", MessageBoxButton.OK, MessageBoxImage.Error);
             Shutdown(-1);
         }
@@ -84,7 +88,33 @@ public partial class App : System.Windows.Application
         base.OnExit(e);
     }
 
-    private static void WriteStartupCrashLog(Exception exception)
+    private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
+    {
+        WriteCrashLog("runtime-crash.txt", e.Exception);
+        e.Handled = true;
+        System.Windows.MessageBox.Show(
+            "Process Governor encountered an unexpected error and must close. Details were saved to the local logs folder.",
+            "Process Governor",
+            MessageBoxButton.OK,
+            MessageBoxImage.Error);
+        Shutdown(-1);
+    }
+
+    private static void OnDomainUnhandledException(object sender, UnhandledExceptionEventArgs e)
+    {
+        if (e.ExceptionObject is Exception exception)
+        {
+            WriteCrashLog("runtime-crash.txt", exception);
+        }
+    }
+
+    private static void OnUnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
+    {
+        WriteCrashLog("background-task-error.txt", e.Exception);
+        e.SetObserved();
+    }
+
+    private static void WriteCrashLog(string fileName, Exception exception)
     {
         try
         {
@@ -93,9 +123,9 @@ public partial class App : System.Windows.Application
                 "ProcessGovernor",
                 "logs");
             Directory.CreateDirectory(root);
-            File.WriteAllText(
-                Path.Combine(root, "startup-crash.txt"),
-                $"TimestampUtc: {DateTimeOffset.UtcNow:O}{Environment.NewLine}{exception}");
+            File.AppendAllText(
+                Path.Combine(root, fileName),
+                $"TimestampUtc: {DateTimeOffset.UtcNow:O}{Environment.NewLine}{exception}{Environment.NewLine}{Environment.NewLine}");
         }
         catch
         {

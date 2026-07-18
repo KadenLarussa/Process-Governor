@@ -11,7 +11,16 @@ public sealed class ProcessRowViewModel : ObservableObject
     private long _workingSetBytes;
     private string _diskUsage = "Unavailable";
     private double? _diskBytesPerSecond;
+    private double? _diskReadBytesPerSecond;
+    private double? _diskWriteBytesPerSecond;
+    private string _diskReadDisplay = "Unavailable";
+    private string _diskWriteDisplay = "Unavailable";
+    private string _diskOperationType = "Unavailable";
+    private string _diskDetail = "Operation rate unavailable";
     private string _gpuUsage = "Unavailable";
+    private double? _gpuUsagePercent;
+    private string _gpuEngine = "Unavailable";
+    private string _gpuDetail = "Unavailable";
     private ProcessPriorityClass? _priority;
     private long? _cpuAffinityMask;
     private string _status = "Running";
@@ -70,10 +79,92 @@ public sealed class ProcessRowViewModel : ObservableObject
         private set => SetProperty(ref _diskBytesPerSecond, value);
     }
 
+    public double? DiskReadBytesPerSecond
+    {
+        get => _diskReadBytesPerSecond;
+        private set
+        {
+            if (SetProperty(ref _diskReadBytesPerSecond, value))
+            {
+                OnPropertyChanged(nameof(HasDiskMetrics));
+            }
+        }
+    }
+
+    public double? DiskWriteBytesPerSecond
+    {
+        get => _diskWriteBytesPerSecond;
+        private set
+        {
+            if (SetProperty(ref _diskWriteBytesPerSecond, value))
+            {
+                OnPropertyChanged(nameof(HasDiskMetrics));
+            }
+        }
+    }
+
+    public bool HasDiskMetrics => DiskReadBytesPerSecond is not null || DiskWriteBytesPerSecond is not null;
+
+    public string DiskReadDisplay
+    {
+        get => _diskReadDisplay;
+        private set => SetProperty(ref _diskReadDisplay, value);
+    }
+
+    public string DiskWriteDisplay
+    {
+        get => _diskWriteDisplay;
+        private set => SetProperty(ref _diskWriteDisplay, value);
+    }
+
+    public string DiskOperationType
+    {
+        get => _diskOperationType;
+        private set => SetProperty(ref _diskOperationType, value);
+    }
+
+    public string DiskDetail
+    {
+        get => _diskDetail;
+        private set => SetProperty(ref _diskDetail, value);
+    }
+
     public string GpuUsage
     {
         get => _gpuUsage;
         private set => SetProperty(ref _gpuUsage, value);
+    }
+
+    public double? GpuUsagePercent
+    {
+        get => _gpuUsagePercent;
+        private set
+        {
+            if (SetProperty(ref _gpuUsagePercent, value))
+            {
+                OnPropertyChanged(nameof(GpuEngineDisplay));
+            }
+        }
+    }
+
+    public string GpuEngine
+    {
+        get => _gpuEngine;
+        private set
+        {
+            if (SetProperty(ref _gpuEngine, value))
+            {
+                OnPropertyChanged(nameof(GpuEngineDisplay));
+            }
+        }
+    }
+
+    public string GpuEngineDisplay => GpuUsagePercent is null ? string.Empty : GpuEngine;
+
+    public string GpuDetail
+    {
+        get => _gpuDetail;
+        private set => SetProperty(ref _gpuDetail, value);
     }
 
     public ProcessPriorityClass? Priority
@@ -146,7 +237,13 @@ public sealed class ProcessRowViewModel : ObservableObject
 
     public string MemoryDisplay => ProcessSnapshot.FormatBytes(WorkingSetBytes);
 
-    public string PriorityDisplay => Priority?.ToString() ?? "Unavailable";
+    public string PriorityDisplay => Priority switch
+    {
+        ProcessPriorityClass.BelowNormal => "Below normal",
+        ProcessPriorityClass.AboveNormal => "Above normal",
+        null => "Unavailable",
+        _ => Priority.Value.ToString()
+    };
 
     public string AffinityDisplay => CpuAffinityMask is null ? "Unavailable" : $"0x{CpuAffinityMask.Value:X}";
 
@@ -161,7 +258,16 @@ public sealed class ProcessRowViewModel : ObservableObject
         WorkingSetBytes = snapshot.WorkingSetBytes;
         DiskUsage = snapshot.DiskUsage;
         DiskBytesPerSecond = snapshot.DiskBytesPerSecond;
+        DiskReadBytesPerSecond = snapshot.DiskReadBytesPerSecond;
+        DiskWriteBytesPerSecond = snapshot.DiskWriteBytesPerSecond;
+        DiskReadDisplay = snapshot.DiskReadDisplay;
+        DiskWriteDisplay = snapshot.DiskWriteDisplay;
+        DiskOperationType = snapshot.DiskOperationType;
+        DiskDetail = snapshot.DiskDetail;
         GpuUsage = snapshot.GpuUsage;
+        GpuUsagePercent = snapshot.GpuUsagePercent;
+        GpuEngine = snapshot.GpuEngine;
+        GpuDetail = snapshot.GpuDetail;
         Priority = snapshot.Priority;
         CpuAffinityMask = snapshot.CpuAffinityMask;
         Status = snapshot.Status;

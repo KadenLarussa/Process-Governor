@@ -13,11 +13,13 @@ internal static class Program
     {
         var runner = new TestRunner();
         await runner.RunAsync("JSON persistence round-trips typed settings", JsonPersistenceRoundTripsAsync);
+        await runner.RunAsync("Legacy appearance defaults migrate safely", LegacyAppearanceDefaultsMigrateAsync);
         await runner.RunAsync("Default automations and profiles are created", DefaultAutomationStoreCreatesPresetsAsync);
         await runner.RunAsync("Rule evaluation handles process, threshold, and window triggers", RuleEvaluationMatchesExpectedTriggers);
         await runner.RunAsync("Startup diagnostics completes without fatal failures", StartupDiagnosticsCompletesAsync);
         await runner.RunAsync("GPU metrics service never fakes or throws", GpuMetricsServiceIsSafe);
         await runner.RunAsync("Process actions work on a disposable child process", ProcessActionsWorkOnChildProcessAsync);
+        await runner.RunAsync("Process monitor idle CPU stays under budget", ProcessMonitorIdleCpuStaysUnderBudgetAsync);
 
         runner.WriteSummary();
         return runner.FailedCount == 0 ? 0 : 1;
@@ -65,6 +67,45 @@ internal static class Program
             Assert.True(store.Profiles.Any(static profile => profile.Name.Equals("Gaming", StringComparison.OrdinalIgnoreCase)), "Gaming profile should exist.");
             Assert.True(store.Profiles.Any(static profile => profile.Name.Equals("Safe PC Boost", StringComparison.OrdinalIgnoreCase)), "Safe PC Boost profile should exist.");
             Assert.Equal(0, brokenReferences, "Profiles should not reference missing rules.");
+        }
+        finally
+        {
+            DeleteTestRoot(root);
+        }
+    }
+
+    private static async Task LegacyAppearanceDefaultsMigrateAsync()
+    {
+        var root = CreateTestRoot();
+        try
+        {
+            var paths = new AppPaths(root);
+            var store = new JsonFileStore();
+            var path = paths.GetConfigPath("settings.json");
+            var previousDefaults = new[]
+            {
+                (Theme: "Dark", Accent: "#4CC2FF"),
+                (Theme: "Midnight Gold", Accent: "#D7B45A")
+            };
+
+            foreach (var previous in previousDefaults)
+            {
+                await store.SaveAsync(path, new AppSettings
+                {
+                    Theme = previous.Theme,
+                    AccentColor = previous.Accent
+                }, CancellationToken.None);
+
+                var service = new SettingsService(paths, store);
+                await service.InitializeAsync(CancellationToken.None);
+
+                Assert.Equal("Soft Graphite", service.Current.Theme, "Legacy theme name should migrate.");
+                Assert.Equal("#70B7FF", service.Current.AccentColor, "Legacy accent should migrate.");
+
+                var persisted = await store.LoadAsync(path, static () => new AppSettings(), CancellationToken.None);
+                Assert.Equal("Soft Graphite", persisted.Theme, "Migrated theme should be persisted.");
+                Assert.Equal("#70B7FF", persisted.AccentColor, "Migrated accent should be persisted.");
+            }
         }
         finally
         {
@@ -164,6 +205,18 @@ internal static class Program
 
         Assert.True(!string.IsNullOrWhiteSpace(snapshot.Display), "GPU metric display should be explicit.");
         Assert.True(snapshot.IsAvailable || snapshot.Display == "Unavailable", "GPU service must either report measured data or Unavailable.");
+        if (snapshot.IsAvailable)
+        {
+            Assert.True(!string.IsNullOrWhiteSpace(snapshot.DominantEngine), "Available GPU metrics should name the dominant engine.");
+            Assert.True(snapshot.UsagePercent is >= 0 and <= 100, "GPU summary usage should stay in the 0-100 range.");
+            foreach (var processMetric in snapshot.Processes)
+            {
+                Assert.Equal(processMetric.Key, processMetric.Value.ProcessId, "GPU process metric key should match its PID.");
+                Assert.True(processMetric.Value.UsagePercent is >= 0 and <= 100, "Per-process GPU usage should stay in the 0-100 range.");
+                Assert.True(!string.IsNullOrWhiteSpace(processMetric.Value.DominantEngine), "Per-process GPU metrics should name an engine.");
+            }
+        }
+
         return Task.CompletedTask;
     }
 
@@ -215,11 +268,49 @@ internal static class Program
         }
     }
 
+    private static async Task ProcessMonitorIdleCpuStaysUnderBudgetAsync()
+    {
+        var root = CreateTestRoot();
+        try
+        {
+            using var provider = BuildProvider(root);
+            var settings = provider.GetRequiredService<ISettingsService>();
+            var logging = provider.GetRequiredService<ILoggingService>();
+            var monitor = provider.GetRequiredService<IProcessMonitorService>();
+            await settings.InitializeAsync(CancellationToken.None);
+            await logging.InitializeAsync(CancellationToken.None);
+            await monitor.StartAsync(CancellationToken.None);
+
+            await Task.Delay(TimeSpan.FromSeconds(3));
+            using var currentProcess = Process.GetCurrentProcess();
+            currentProcess.Refresh();
+            var cpuStart = currentProcess.TotalProcessorTime;
+            var stopwatch = Stopwatch.StartNew();
+            await Task.Delay(TimeSpan.FromSeconds(12));
+            stopwatch.Stop();
+            currentProcess.Refresh();
+            var cpuDelta = currentProcess.TotalProcessorTime - cpuStart;
+            var normalizedCpu = cpuDelta.TotalMilliseconds /
+                                stopwatch.Elapsed.TotalMilliseconds /
+                                Math.Max(1, Environment.ProcessorCount) *
+                                100;
+
+            await monitor.StopAsync();
+            Console.WriteLine($"     measured normalized CPU: {normalizedCpu:0.000}%");
+            Assert.True(normalizedCpu < 0.5, $"Headless process monitoring used {normalizedCpu:0.000}% CPU; target is below 0.5%.");
+        }
+        finally
+        {
+            DeleteTestRoot(root);
+        }
+    }
+
     private static AppServiceProvider BuildProvider(string root)
         => new ServiceRegistry()
             .AddSingleton(_ => new AppPaths(root))
             .AddSingleton<IJsonFileStore, JsonFileStore>()
             .AddSingleton<ISettingsService, SettingsService>()
+            .AddSingleton<IThemeService, ThemeService>()
             .AddSingleton<IStartupRegistrationService, StartupRegistrationService>()
             .AddSingleton<ILoggingService, LoggingService>()
             .AddSingleton<IGpuMetricsService, GpuMetricsService>()

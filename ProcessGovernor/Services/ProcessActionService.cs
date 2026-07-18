@@ -8,10 +8,12 @@ namespace ProcessGovernor.Services;
 public sealed class ProcessActionService : IProcessActionService
 {
     private readonly ILoggingService _loggingService;
+    private readonly IProcessMonitorService _processMonitorService;
 
-    public ProcessActionService(ILoggingService loggingService)
+    public ProcessActionService(ILoggingService loggingService, IProcessMonitorService processMonitorService)
     {
         _loggingService = loggingService;
+        _processMonitorService = processMonitorService;
     }
 
     public bool IsCriticalProcess(ProcessSnapshot process) => process.IsCritical;
@@ -60,6 +62,7 @@ public sealed class ProcessActionService : IProcessActionService
             using var process = Process.GetProcessById(processId);
             var oldPriority = process.PriorityClass;
             process.PriorityClass = priority;
+            _processMonitorService.InvalidateProcessMetadata(processId);
             var message = $"Changed priority for {process.ProcessName} ({processId}) from {oldPriority} to {priority}.";
             await _loggingService.LogAsync(LogSeverity.Information, nameof(ProcessActionService), message, processId: processId, cancellationToken: cancellationToken).ConfigureAwait(false);
             return ProcessActionResult.Success(message);
@@ -108,6 +111,7 @@ public sealed class ProcessActionService : IProcessActionService
             using var process = Process.GetProcessById(processId);
             var oldAffinity = process.ProcessorAffinity.ToInt64();
             process.ProcessorAffinity = new IntPtr(affinityMask);
+            _processMonitorService.InvalidateProcessMetadata(processId);
             var message = $"Changed CPU affinity for {process.ProcessName} ({processId}) from 0x{oldAffinity:X} to 0x{affinityMask:X}.";
             await _loggingService.LogAsync(LogSeverity.Information, nameof(ProcessActionService), message, processId: processId, cancellationToken: cancellationToken).ConfigureAwait(false);
             return ProcessActionResult.Success(message);

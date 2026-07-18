@@ -11,12 +11,18 @@ namespace ProcessGovernor.ViewModels;
 
 public sealed class DashboardViewModel : ObservableObject
 {
+    private static readonly long RowRefreshIntervalTicks = Stopwatch.Frequency * 3;
+    private static readonly long ViewResortIntervalTicks = Stopwatch.Frequency * 6;
+
     private readonly IProcessMonitorService _processMonitorService;
     private readonly IProcessActionService _processActionService;
     private readonly IDialogService _dialogService;
     private readonly Dictionary<int, ProcessRowViewModel> _rowsByPid = new();
     private string _searchText = string.Empty;
     private SystemSummary _summary = new();
+    private ProcessRowViewModel? _selectedProcess;
+    private long _lastRowRefreshTimestamp;
+    private long _lastViewResortTimestamp;
 
     public DashboardViewModel(
         IProcessMonitorService processMonitorService,
@@ -31,6 +37,7 @@ public sealed class DashboardViewModel : ObservableObject
         ProcessesView.Filter = FilterProcess;
         ProcessesView.SortDescriptions.Add(new SortDescription(nameof(ProcessRowViewModel.CpuUsagePercent), ListSortDirection.Descending));
 
+        ClearSearchCommand = new RelayCommand(() => SearchText = string.Empty, () => !string.IsNullOrWhiteSpace(SearchText));
         KillProcessCommand = new AsyncRelayCommand((parameter, token) => KillProcessAsync(parameter, false, token));
         EndProcessTreeCommand = new AsyncRelayCommand((parameter, token) => KillProcessAsync(parameter, true, token));
         OpenFileLocationCommand = new AsyncRelayCommand(OpenFileLocationAsync);
@@ -53,7 +60,15 @@ public sealed class DashboardViewModel : ObservableObject
 
     public ICollectionView ProcessesView { get; }
 
+    public ProcessRowViewModel? SelectedProcess
+    {
+        get => _selectedProcess;
+        set => SetProperty(ref _selectedProcess, value);
+    }
+
     public AsyncRelayCommand KillProcessCommand { get; }
+
+    public RelayCommand ClearSearchCommand { get; }
 
     public AsyncRelayCommand EndProcessTreeCommand { get; }
 
@@ -89,6 +104,8 @@ public sealed class DashboardViewModel : ObservableObject
             if (SetProperty(ref _searchText, value))
             {
                 ProcessesView.Refresh();
+                EnsureSelection();
+                ClearSearchCommand.RaiseCanExecuteChanged();
             }
         }
     }
@@ -107,12 +124,24 @@ public sealed class DashboardViewModel : ObservableObject
     private void ApplySnapshot(ProcessSnapshotBatch batch)
     {
         Summary = batch.Summary;
+        var now = Stopwatch.GetTimestamp();
+        if (_lastRowRefreshTimestamp != 0 && now - _lastRowRefreshTimestamp < RowRefreshIntervalTicks)
+        {
+            return;
+        }
+
+        _lastRowRefreshTimestamp = now;
         var livePids = batch.Processes.Select(static process => process.ProcessId).ToHashSet();
 
         for (var i = Processes.Count - 1; i >= 0; i--)
         {
             if (!livePids.Contains(Processes[i].ProcessId))
             {
+                if (ReferenceEquals(Processes[i], SelectedProcess))
+                {
+                    SelectedProcess = null;
+                }
+
                 _rowsByPid.Remove(Processes[i].ProcessId);
                 Processes.RemoveAt(i);
             }
@@ -131,7 +160,23 @@ public sealed class DashboardViewModel : ObservableObject
             Processes.Add(row);
         }
 
-        ProcessesView.Refresh();
+        if (_lastViewResortTimestamp == 0 || now - _lastViewResortTimestamp >= ViewResortIntervalTicks)
+        {
+            _lastViewResortTimestamp = now;
+            ProcessesView.Refresh();
+        }
+
+        EnsureSelection();
+    }
+
+    private void EnsureSelection()
+    {
+        if (SelectedProcess is not null && ProcessesView.Contains(SelectedProcess))
+        {
+            return;
+        }
+
+        SelectedProcess = ProcessesView.Cast<ProcessRowViewModel>().FirstOrDefault();
     }
 
     private bool FilterProcess(object item)

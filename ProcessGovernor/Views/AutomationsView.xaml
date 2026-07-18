@@ -102,7 +102,7 @@
 
                 <Border Grid.Row="2"
                         Grid.ColumnSpan="4"
-                        Background="#101820"
+                        Background="{StaticResource FieldSurfaceBrush}"
                         BorderBrush="{StaticResource BorderBrushSoft}"
                         BorderThickness="1"
                         CornerRadius="8"

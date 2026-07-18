@@ -2,13 +2,19 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Process Governor"
-        Width="680"
-        Height="520"
+        Icon="../Assets/ProcessGovernor.png"
+        Width="700"
+        Height="540"
         ResizeMode="NoResize"
         WindowStartupLocation="CenterScreen"
         ShowInTaskbar="True"
-        Background="{StaticResource WindowBrush}">
-    <Grid Margin="24">
+        Background="{StaticResource WindowBrush}"
+        Opacity="0"
+        Loaded="Window_Loaded">
+    <Grid x:Name="RootContent" Margin="26">
+        <Grid.RenderTransform>
+            <TranslateTransform x:Name="StartupTranslate" Y="8" />
+        </Grid.RenderTransform>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -16,10 +22,26 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <StackPanel>
-            <TextBlock Text="Process Governor" FontSize="28" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}" />
-            <TextBlock Text="Running startup checks before the UI opens" Style="{StaticResource MutedText}" Margin="0,4,0,0" />
-        </StackPanel>
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="48" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Image Width="38"
+                   Height="38"
+                   HorizontalAlignment="Left"
+                   Source="../Assets/ProcessGovernor.png"
+                   RenderOptions.BitmapScalingMode="HighQuality" />
+            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                <TextBlock Text="Process Governor" FontSize="25" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}" />
+                <TextBlock Text="Verifying local services before launch" Style="{StaticResource MutedText}" Margin="0,3,0,0" />
+            </StackPanel>
+            <TextBlock Grid.Column="2"
+                       Text="SYSTEM READINESS"
+                       Style="{StaticResource BadgeText}"
+                       VerticalAlignment="Center" />
+        </Grid>
 
         <Border Grid.Row="1"
                 Style="{StaticResource CardBorder}"
@@ -35,29 +57,25 @@
                     <ProgressBar Value="{Binding ProgressValue, Mode=OneWay}"
                                  Minimum="0"
                                  Maximum="100"
-                                 Height="6"
                                  Margin="0,12,0,0"
-                                 Foreground="{StaticResource AccentBrush}"
-                                 Background="#0F151D" />
+                                 Style="{StaticResource AccentProgressBar}" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="18,0,0,0">
-                    <TextBlock Text="{Binding PassedCount}" Foreground="MediumSeaGreen" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding PassedCount}" Foreground="{StaticResource SuccessBrush}" FontWeight="SemiBold" />
                     <TextBlock Text=" pass  " Style="{StaticResource MutedText}" />
-                    <TextBlock Text="{Binding WarningCount}" Foreground="Goldenrod" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding WarningCount}" Foreground="{StaticResource WarningBrush}" FontWeight="SemiBold" />
                     <TextBlock Text=" warn  " Style="{StaticResource MutedText}" />
-                    <TextBlock Text="{Binding FailedCount}" Foreground="IndianRed" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding FailedCount}" Foreground="{StaticResource DangerBrush}" FontWeight="SemiBold" />
                     <TextBlock Text=" fail" Style="{StaticResource MutedText}" />
                 </StackPanel>
             </Grid>
         </Border>
 
         <Border Grid.Row="2"
-                Background="{StaticResource PanelBrush}"
-                BorderBrush="{StaticResource BorderBrushSoft}"
-                BorderThickness="1"
-                CornerRadius="10"
+                Style="{StaticResource InsetBorder}"
                 Padding="8">
-            <ListBox ItemsSource="{Binding Checks}">
+            <ListBox ItemsSource="{Binding Checks}"
+                     ItemContainerStyle="{StaticResource AnimatedStartupListItemStyle}">
                 <ListBox.ItemTemplate>
                     <DataTemplate>
                         <Grid Margin="2,4">
@@ -67,7 +85,7 @@
                                 <ColumnDefinition Width="70" />
                             </Grid.ColumnDefinitions>
 
-                            <Border Background="#101820"
+                            <Border Background="{StaticResource FieldSurfaceBrush}"
                                     BorderBrush="{Binding StatusBrush}"
                                     BorderThickness="1"
                                     CornerRadius="6"
@@ -98,9 +116,13 @@
             </ListBox>
         </Border>
 
-        <TextBlock Grid.Row="3"
-                   Text="Checks are local-only. No telemetry, no cloud calls, no synthetic benchmark claims."
-                   Style="{StaticResource MutedText}"
-                   Margin="0,14,0,0" />
+        <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,14,0,0">
+            <TextBlock Text="&#xE72E;"
+                       FontFamily="Segoe Fluent Icons"
+                       Foreground="{DynamicResource AccentBrush}"
+                       Margin="0,1,8,0" />
+            <TextBlock Text="Local-only checks. No telemetry, cloud calls, or synthetic performance claims."
+                       Style="{StaticResource MutedText}" />
+        </StackPanel>
     </Grid>
 </Window>

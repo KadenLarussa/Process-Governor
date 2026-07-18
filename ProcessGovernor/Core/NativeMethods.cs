@@ -56,7 +56,7 @@ internal static class NativeMethods
     [DllImport("user32.dll", SetLastError = true)]
     internal static extern bool GetMonitorInfo(IntPtr monitor, ref MonitorInfo monitorInfo);
 
-    // PDH is the least invasive built-in path for summary GPU activity on Windows.
+    // PDH exposes measured GPU engine activity and tags instances with process IDs and engine types.
     // It can be absent or disabled on some systems, so callers must keep an Unavailable fallback.
     [DllImport("pdh.dll", EntryPoint = "PdhOpenQueryW", CharSet = CharSet.Unicode)]
     internal static extern uint PdhOpenQuery(string? dataSource, IntPtr userData, out IntPtr query);

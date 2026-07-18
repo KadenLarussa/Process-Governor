@@ -21,6 +21,12 @@ public sealed class SettingsService : ISettingsService
     public async Task InitializeAsync(CancellationToken cancellationToken)
     {
         Current = await _store.LoadAsync(_paths.GetConfigPath("settings.json"), static () => new AppSettings(), cancellationToken).ConfigureAwait(false);
+        var migrated = MigrateAppearanceDefaults(Current);
+        if (migrated)
+        {
+            await _store.SaveAsync(_paths.GetConfigPath("settings.json"), Current, cancellationToken).ConfigureAwait(false);
+        }
+
         SettingsChanged?.Invoke(this, Current);
     }
 
@@ -29,5 +35,25 @@ public sealed class SettingsService : ISettingsService
         Current = settings;
         await _store.SaveAsync(_paths.GetConfigPath("settings.json"), settings, cancellationToken).ConfigureAwait(false);
         SettingsChanged?.Invoke(this, Current);
+    }
+
+    private static bool MigrateAppearanceDefaults(AppSettings settings)
+    {
+        var changed = false;
+        if (string.Equals(settings.Theme, "Dark", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(settings.Theme, "Midnight Gold", StringComparison.OrdinalIgnoreCase))
+        {
+            settings.Theme = "Soft Graphite";
+            changed = true;
+        }
+
+        if (string.Equals(settings.AccentColor, "#4CC2FF", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(settings.AccentColor, "#D7B45A", StringComparison.OrdinalIgnoreCase))
+        {
+            settings.AccentColor = "#70B7FF";
+            changed = true;
+        }
+
+        return changed;
     }
 }

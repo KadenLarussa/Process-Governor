@@ -12,6 +12,7 @@ public static class ServiceConfiguration
             .AddSingleton(_ => new AppPaths())
             .AddSingleton<IJsonFileStore, JsonFileStore>()
             .AddSingleton<ISettingsService, SettingsService>()
+            .AddSingleton<IThemeService, ThemeService>()
             .AddSingleton<IStartupRegistrationService, StartupRegistrationService>()
             .AddSingleton<ILoggingService, LoggingService>()
             .AddSingleton<IGpuMetricsService, GpuMetricsService>()

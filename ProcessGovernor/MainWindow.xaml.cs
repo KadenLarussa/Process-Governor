@@ -1,7 +1,8 @@
 using System.ComponentModel;
 using System.Windows;
+using System.Windows.Data;
 using System.Windows.Documents;
-using System.Windows.Interop;
+using System.Windows.Media.Animation;
 using ProcessGovernor.Core;
 using ProcessGovernor.Models;
 using ProcessGovernor.Services;
@@ -25,6 +26,47 @@ public partial class MainWindow : Window
 
     public void AllowExit() => _allowExit = true;
 
+    private void Window_Loaded(object sender, RoutedEventArgs e)
+    {
+        if (!SystemParameters.ClientAreaAnimation)
+        {
+            Opacity = 1;
+            ShellScale.ScaleX = 1;
+            ShellScale.ScaleY = 1;
+            return;
+        }
+
+        var ease = new QuadraticEase { EasingMode = EasingMode.EaseOut };
+        BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(220))
+        {
+            EasingFunction = ease
+        });
+        ShellScale.BeginAnimation(
+            System.Windows.Media.ScaleTransform.ScaleXProperty,
+            new DoubleAnimation(0.992, 1, TimeSpan.FromMilliseconds(220)) { EasingFunction = ease });
+        ShellScale.BeginAnimation(
+            System.Windows.Media.ScaleTransform.ScaleYProperty,
+            new DoubleAnimation(0.992, 1, TimeSpan.FromMilliseconds(220)) { EasingFunction = ease });
+    }
+
+    private void PageHost_TargetUpdated(object sender, DataTransferEventArgs e)
+    {
+        if (!IsLoaded || !SystemParameters.ClientAreaAnimation)
+        {
+            PageHost.Opacity = 1;
+            PageTranslate.Y = 0;
+            return;
+        }
+
+        var ease = new QuadraticEase { EasingMode = EasingMode.EaseOut };
+        PageHost.BeginAnimation(
+            OpacityProperty,
+            new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(170)) { EasingFunction = ease });
+        PageTranslate.BeginAnimation(
+            System.Windows.Media.TranslateTransform.YProperty,
+            new DoubleAnimation(8, 0, TimeSpan.FromMilliseconds(190)) { EasingFunction = ease });
+    }
+
     private void OnSettingsChanged(object? sender, AppSettings settings)
     {
         Dispatcher.InvokeAsync(() => ApplyDensity(settings.CompactMode));
@@ -33,7 +75,7 @@ public partial class MainWindow : Window
     protected override void OnSourceInitialized(EventArgs e)
     {
         base.OnSourceInitialized(e);
-        TryEnableDarkTitleBar();
+        WindowAppearance.TryEnableDarkTitleBar(this);
     }
 
     protected override void OnStateChanged(EventArgs e)
@@ -65,33 +107,8 @@ public partial class MainWindow : Window
     private void ApplyDensity(bool compactMode)
     {
         RootShell.SetValue(TextElement.FontSizeProperty, compactMode ? 12.0 : 13.0);
-        Sidebar.Padding = compactMode ? new Thickness(12) : new Thickness(16);
-        PageHost.Margin = compactMode ? new Thickness(14) : new Thickness(22);
+        Sidebar.Padding = compactMode ? new Thickness(13) : new Thickness(18);
+        PageHost.Margin = compactMode ? new Thickness(15) : new Thickness(24);
     }
 
-    private void TryEnableDarkTitleBar()
-    {
-        var hwnd = new WindowInteropHelper(this).Handle;
-        if (hwnd == IntPtr.Zero)
-        {
-            return;
-        }
-
-        var enabled = 1;
-        var size = sizeof(int);
-        var result = NativeMethods.DwmSetWindowAttribute(
-            hwnd,
-            NativeMethods.DwmWindowAttributeUseImmersiveDarkMode,
-            ref enabled,
-            size);
-
-        if (result != 0)
-        {
-            _ = NativeMethods.DwmSetWindowAttribute(
-                hwnd,
-                NativeMethods.DwmWindowAttributeUseImmersiveDarkModeBefore20H1,
-                ref enabled,
-                size);
-        }
-    }
 }

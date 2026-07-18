@@ -52,6 +52,8 @@ public interface IProcessMonitorService
     void ApplySettings(AppSettings settings);
 
     void SetWindowMinimized(bool isMinimized);
+
+    void InvalidateProcessMetadata(int processId);
 }
 
 public interface IGpuMetricsService
@@ -99,6 +101,11 @@ public interface IRuleEvaluationService
 public interface IStartupRegistrationService
 {
     Task<ProcessActionResult> SetEnabledAsync(bool enabled, CancellationToken cancellationToken);
+}
+
+public interface IThemeService
+{
+    void Apply(AppSettings settings);
 }
 
 public interface IStartupDiagnosticsService
