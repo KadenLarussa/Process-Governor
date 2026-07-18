@@ -25,6 +25,12 @@
             <Setter Property="Margin" Value="0,0,0,3" />
         </Style>
 
+        <Style x:Key="DashboardTextCell" TargetType="{x:Type TextBlock}">
+            <Setter Property="Margin" Value="10,0,8,0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        </Style>
+
         <Style x:Key="DashboardRowStyle"
                TargetType="{x:Type DataGridRow}"
                BasedOn="{StaticResource {x:Type DataGridRow}}">
@@ -248,6 +254,9 @@
                   SelectionMode="Extended"
                   SelectionUnit="FullRow"
                   RowStyle="{StaticResource DashboardRowStyle}"
+                  GridLinesVisibility="All"
+                  HorizontalGridLinesBrush="{StaticResource BorderBrushSoft}"
+                  VerticalGridLinesBrush="#2B3035"
                   VirtualizingPanel.IsVirtualizing="True"
                   VirtualizingPanel.VirtualizationMode="Recycling"
                   ScrollViewer.CanContentScroll="True"
@@ -310,7 +319,8 @@
                 <DataGridTemplateColumn Header="Process" SortMemberPath="Name" Width="*" MinWidth="230">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <StackPanel ToolTip="{Binding ExecutablePathDisplay}">
+                            <StackPanel Margin="12,0,8,0"
+                                        ToolTip="{Binding ExecutablePathDisplay}">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="{Binding Name}"
                                                FontWeight="SemiBold"
@@ -338,7 +348,8 @@
                 <DataGridTemplateColumn Header="CPU" SortMemberPath="CpuUsagePercent" Width="95">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <Grid ToolTip="Measured CPU usage over the latest process sample.">
+                            <Grid Margin="10,0,8,0"
+                                  ToolTip="Measured CPU usage over the latest process sample.">
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
@@ -364,6 +375,7 @@
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding MemoryDisplay}"
+                                       Margin="10,0,8,0"
                                        Foreground="{StaticResource TextBrush}"
                                        FontWeight="SemiBold"
                                        ToolTip="Private working-set memory currently held by this process." />
@@ -377,7 +389,8 @@
                     </DataGridTemplateColumn.Header>
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <Grid ToolTip="{Binding DiskDetail}">
+                            <Grid Margin="10,0,8,0"
+                                  ToolTip="{Binding DiskDetail}">
                                 <Grid x:Name="DiskMetrics">
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="Auto" />
@@ -414,7 +427,8 @@
                     </DataGridTemplateColumn.Header>
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <StackPanel ToolTip="{Binding GpuDetail}">
+                            <StackPanel Margin="10,0,8,0"
+                                        ToolTip="{Binding GpuDetail}">
                                 <TextBlock Text="{Binding GpuUsage}"
                                            Foreground="{Binding GpuUsagePercent, Converter={StaticResource UsageHeatBrushConverter}}"
                                            FontWeight="SemiBold" />
@@ -431,12 +445,15 @@
                 <DataGridTextColumn Header="Priority"
                                     Binding="{Binding PriorityDisplay}"
                                     SortMemberPath="Priority"
+                                    ElementStyle="{StaticResource DashboardTextCell}"
                                     Width="120" />
 
                 <DataGridTemplateColumn Header="Status" SortMemberPath="Status" Width="110">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <StackPanel Margin="10,0,8,0"
+                                        Orientation="Horizontal"
+                                        VerticalAlignment="Center">
                                 <Border Width="7"
                                         Height="7"
                                         Background="{StaticResource SuccessBrush}"
