@@ -30,11 +30,11 @@ public sealed class MainViewModel : ObservableObject
 
         NavigationItems =
         [
-            new PageNavigationItem("Dashboard", dashboardViewModel, "D"),
-            new PageNavigationItem("Automations", automationsViewModel, "A"),
-            new PageNavigationItem("Profiles", profilesViewModel, "P"),
-            new PageNavigationItem("Logs", logsViewModel, "L"),
-            new PageNavigationItem("Settings", settingsViewModel, "S")
+            new PageNavigationItem("Dashboard", dashboardViewModel, "\uE80F"),
+            new PageNavigationItem("Automations", automationsViewModel, "\uE768"),
+            new PageNavigationItem("Profiles", profilesViewModel, "\uE77B"),
+            new PageNavigationItem("Logs", logsViewModel, "\uE8A5"),
+            new PageNavigationItem("Settings", settingsViewModel, "\uE713")
         ];
 
         SelectedNavigationItem = NavigationItems[0];

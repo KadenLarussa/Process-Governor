@@ -122,8 +122,9 @@ public sealed class GpuMetricsService : IGpuMetricsService, IDisposable
             }
 
             var itemSize = Marshal.SizeOf<NativeMethods.PdhFmtCounterValueItem>();
-            var highestEngineUsage = 0d;
             var validCounterCount = 0;
+            var engineTotals = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+            var processEngineTotals = new Dictionary<int, Dictionary<string, double>>();
 
             for (var index = 0u; index < itemCount; index++)
             {
@@ -146,18 +147,130 @@ public sealed class GpuMetricsService : IGpuMetricsService, IDisposable
                     continue;
                 }
 
-                highestEngineUsage = Math.Max(highestEngineUsage, value);
+                var engineType = ExtractEngineType(name);
+                if (engineType is null)
+                {
+                    continue;
+                }
+
+                engineTotals[engineType] = engineTotals.GetValueOrDefault(engineType) + value;
+                if (TryExtractProcessId(name, out var processId) && processId > 0)
+                {
+                    if (!processEngineTotals.TryGetValue(processId, out var processEngines))
+                    {
+                        processEngines = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+                        processEngineTotals[processId] = processEngines;
+                    }
+
+                    processEngines[engineType] = processEngines.GetValueOrDefault(engineType) + value;
+                }
+
                 validCounterCount++;
             }
 
-            return validCounterCount == 0
-                ? GpuMetricSnapshot.Unavailable("No valid GPU engine counters were returned.")
-                : GpuMetricSnapshot.Available(highestEngineUsage, SourceName);
+            if (validCounterCount == 0 || engineTotals.Count == 0)
+            {
+                return GpuMetricSnapshot.Unavailable("No valid GPU engine counters were returned.");
+            }
+
+            var normalizedEngines = engineTotals.ToDictionary(
+                static engine => engine.Key,
+                static engine => Math.Clamp(engine.Value, 0, 100),
+                StringComparer.OrdinalIgnoreCase);
+            var dominantEngine = normalizedEngines.MaxBy(static engine => engine.Value);
+            var processMetrics = new Dictionary<int, ProcessGpuMetric>(processEngineTotals.Count);
+            foreach (var process in processEngineTotals)
+            {
+                var engines = process.Value.ToDictionary(
+                    static engine => engine.Key,
+                    static engine => Math.Clamp(engine.Value, 0, 100),
+                    StringComparer.OrdinalIgnoreCase);
+                var dominant = engines.MaxBy(static engine => engine.Value);
+                processMetrics[process.Key] = new ProcessGpuMetric
+                {
+                    ProcessId = process.Key,
+                    UsagePercent = dominant.Value,
+                    DominantEngine = dominant.Key,
+                    Engines = engines
+                };
+            }
+
+            return GpuMetricSnapshot.Available(
+                dominantEngine.Value,
+                SourceName,
+                dominantEngine.Key,
+                processMetrics,
+                $"{string.Join(" | ", normalizedEngines.OrderByDescending(static engine => engine.Value).Select(static engine => $"{engine.Key} {engine.Value:0.0}%"))} | {SourceName}");
         }
         finally
         {
             Marshal.FreeHGlobal(buffer);
         }
+    }
+
+    private static bool TryExtractProcessId(string instanceName, out int processId)
+    {
+        const string marker = "pid_";
+        var markerIndex = instanceName.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+        if (markerIndex < 0)
+        {
+            processId = 0;
+            return false;
+        }
+
+        var start = markerIndex + marker.Length;
+        var end = instanceName.IndexOf('_', start);
+        if (end < 0)
+        {
+            end = instanceName.Length;
+        }
+
+        return int.TryParse(instanceName.AsSpan(start, end - start), out processId);
+    }
+
+    private static string? ExtractEngineType(string instanceName)
+    {
+        const string marker = "engtype_";
+        var markerIndex = instanceName.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+        if (markerIndex < 0)
+        {
+            return null;
+        }
+
+        var raw = instanceName[(markerIndex + marker.Length)..].Trim();
+        if (raw.StartsWith("VideoDecode", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Decode";
+        }
+
+        if (raw.StartsWith("VideoEncode", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Encode";
+        }
+
+        if (raw.StartsWith("VideoProcessing", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Video";
+        }
+
+        if (raw.StartsWith("3D", StringComparison.OrdinalIgnoreCase))
+        {
+            return "3D";
+        }
+
+        if (raw.StartsWith("Compute", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Compute";
+        }
+
+        if (raw.StartsWith("Copy", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Copy";
+        }
+
+        var separator = raw.IndexOf('_');
+        var label = separator > 0 ? raw[..separator] : raw;
+        return string.IsNullOrWhiteSpace(label) ? "Other" : label;
     }
 
     private void MarkUnsupported(string reason)

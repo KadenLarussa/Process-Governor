@@ -298,7 +298,7 @@ public sealed class AutomationsViewModel : ObservableObject
     {
         _store = await _rulePersistenceService.LoadAsync(cancellationToken).ConfigureAwait(false);
         var powerPlans = await _powerPlanService.GetAvailablePlansAsync(cancellationToken).ConfigureAwait(false);
-        await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+        await UiDispatch.InvokeAsync(() =>
         {
             Rules.Clear();
             foreach (var rule in _store.Rules.OrderBy(static rule => rule.Name))
@@ -666,7 +666,7 @@ public sealed class AutomationsViewModel : ObservableObject
             profile.RuleIds.Remove(selected.Id);
         }
 
-        await System.Windows.Application.Current.Dispatcher.InvokeAsync(() => Rules.Remove(selected));
+        await UiDispatch.InvokeAsync(() => Rules.Remove(selected));
         SelectedRule = null;
         await SaveAsync(cancellationToken).ConfigureAwait(false);
     }

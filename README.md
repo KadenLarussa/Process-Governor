@@ -8,11 +8,11 @@ This is not a RAM optimizer, FPS booster, registry tweak pack, or telemetry clie
 
 The current branch includes:
 
-- Live process dashboard with search, sorting, virtualized grid rows, and summary cards.
+- Live process dashboard with search, sorting, virtualized rows, a unified activity strip, and a selected-process inspector.
 - CPU and RAM metrics from low-overhead APIs.
-- Disk I/O rates from native process I/O counters when Windows grants access.
-- Summary GPU usage from the Windows PDH GPU Engine counter when available; otherwise `Unavailable`.
-- Per-process GPU usage remains `Unavailable` instead of being guessed.
+- Per-process disk read/write transfer rates and operation rates from native process I/O counters when Windows grants access.
+- Summary and per-process GPU usage from Windows PDH GPU Engine counters, including dominant `3D`, encode, decode, compute, copy, and video engine labels when available.
+- Explicit `Unavailable` fallbacks when Windows does not return a reliable disk or GPU measurement.
 - Kill process and end process tree, with critical-process warnings.
 - Open file location and copy executable path.
 - Set process priority: Idle, Below Normal, Normal, Above Normal, High.
@@ -33,7 +33,7 @@ Phase 2 branch work adds:
 - A default `Safe PC Boost` PC optimization profile that stays dormant until activated.
 - CPU affinity display and dashboard presets for all CPUs, first half, and second half.
 - Suspend and resume process actions using native Windows process handles.
-- Per-process and summary disk I/O rates from native process I/O counters when Windows grants access.
+- Per-process and summary disk read/write rates from native process I/O counters when Windows grants access.
 - Automation CPU and RAM threshold triggers.
 - Automation CPU affinity actions with decimal or hex masks.
 - Automation Windows power plan actions with rollback to the previous plan when rollback protection is enabled.
@@ -48,7 +48,7 @@ Phase 3 branch work adds:
 - A custom CPU affinity mask editor with all, first-half, and second-half presets.
 - Start with Windows registration through the current user's Run key.
 - Compact-mode shell density changes across pages.
-- A low-overhead GPU metrics service that uses PDH when available and falls back to `Unavailable`.
+- A GPU metrics service that maps PDH engine instances to process IDs and reports measured engine types when available.
 - Plugin contracts for future extension without runtime plugin loading yet.
 
 The optimization profile is intentionally conservative. It does not clean RAM, force garbage collection, apply registry tweak packs, disable services blindly, or claim fake FPS gains. It uses measurable, reversible actions: priority changes, power plan switching, affinity options, notifications, logs, and rollback where possible.
@@ -71,6 +71,12 @@ Run from source:
 
 ```powershell
 dotnet run --project .\ProcessGovernor\ProcessGovernor.csproj
+```
+
+Run the local functionality harness:
+
+```powershell
+dotnet run --project .\ProcessGovernor.TestHarness\ProcessGovernor.TestHarness.csproj
 ```
 
 Publish a self-contained folder build:
@@ -105,5 +111,8 @@ Important services:
 - `ElevationService`
 - `LoggingService`
 - `StartupRegistrationService`
+- `StartupDiagnosticsService`
 
-The app avoids WMI polling for core process monitoring. CPU and memory summary metrics use small Win32 P/Invoke calls, summary GPU uses PDH when the Windows counter is available, and per-process data comes from `System.Diagnostics.Process`. Access denied and race conditions from short-lived processes are handled gracefully.
+The app avoids WMI polling for core process monitoring. CPU and memory summary metrics use small Win32 P/Invoke calls, disk rates use native process I/O counters, GPU metrics use PDH engine instances, and process metadata comes from `System.Diagnostics.Process`. Access denied and race conditions from short-lived processes are handled gracefully.
+
+The startup diagnostics window runs local readiness checks before the main UI opens. See [docs/startup-diagnostics-test-plan.md](docs/startup-diagnostics-test-plan.md) for the analysis and smoke-test plan.

@@ -11,12 +11,18 @@ namespace ProcessGovernor.ViewModels;
 
 public sealed class DashboardViewModel : ObservableObject
 {
+    private static readonly long RowRefreshIntervalTicks = Stopwatch.Frequency * 3;
+    private static readonly long ViewResortIntervalTicks = Stopwatch.Frequency * 6;
+
     private readonly IProcessMonitorService _processMonitorService;
     private readonly IProcessActionService _processActionService;
     private readonly IDialogService _dialogService;
     private readonly Dictionary<int, ProcessRowViewModel> _rowsByPid = new();
     private string _searchText = string.Empty;
     private SystemSummary _summary = new();
+    private ProcessRowViewModel? _selectedProcess;
+    private long _lastRowRefreshTimestamp;
+    private long _lastViewResortTimestamp;
 
     public DashboardViewModel(
         IProcessMonitorService processMonitorService,
@@ -31,6 +37,7 @@ public sealed class DashboardViewModel : ObservableObject
         ProcessesView.Filter = FilterProcess;
         ProcessesView.SortDescriptions.Add(new SortDescription(nameof(ProcessRowViewModel.CpuUsagePercent), ListSortDirection.Descending));
 
+        ClearSearchCommand = new RelayCommand(() => SearchText = string.Empty, () => !string.IsNullOrWhiteSpace(SearchText));
         KillProcessCommand = new AsyncRelayCommand((parameter, token) => KillProcessAsync(parameter, false, token));
         EndProcessTreeCommand = new AsyncRelayCommand((parameter, token) => KillProcessAsync(parameter, true, token));
         OpenFileLocationCommand = new AsyncRelayCommand(OpenFileLocationAsync);
@@ -53,7 +60,15 @@ public sealed class DashboardViewModel : ObservableObject
 
     public ICollectionView ProcessesView { get; }
 
+    public ProcessRowViewModel? SelectedProcess
+    {
+        get => _selectedProcess;
+        set => SetProperty(ref _selectedProcess, value);
+    }
+
     public AsyncRelayCommand KillProcessCommand { get; }
+
+    public RelayCommand ClearSearchCommand { get; }
 
     public AsyncRelayCommand EndProcessTreeCommand { get; }
 
@@ -89,6 +104,8 @@ public sealed class DashboardViewModel : ObservableObject
             if (SetProperty(ref _searchText, value))
             {
                 ProcessesView.Refresh();
+                EnsureSelection();
+                ClearSearchCommand.RaiseCanExecuteChanged();
             }
         }
     }
@@ -101,18 +118,30 @@ public sealed class DashboardViewModel : ObservableObject
 
     private void OnSnapshotUpdated(object? sender, ProcessSnapshotBatch batch)
     {
-        System.Windows.Application.Current.Dispatcher.InvokeAsync(() => ApplySnapshot(batch));
+        _ = UiDispatch.InvokeAsync(() => ApplySnapshot(batch));
     }
 
     private void ApplySnapshot(ProcessSnapshotBatch batch)
     {
         Summary = batch.Summary;
+        var now = Stopwatch.GetTimestamp();
+        if (_lastRowRefreshTimestamp != 0 && now - _lastRowRefreshTimestamp < RowRefreshIntervalTicks)
+        {
+            return;
+        }
+
+        _lastRowRefreshTimestamp = now;
         var livePids = batch.Processes.Select(static process => process.ProcessId).ToHashSet();
 
         for (var i = Processes.Count - 1; i >= 0; i--)
         {
             if (!livePids.Contains(Processes[i].ProcessId))
             {
+                if (ReferenceEquals(Processes[i], SelectedProcess))
+                {
+                    SelectedProcess = null;
+                }
+
                 _rowsByPid.Remove(Processes[i].ProcessId);
                 Processes.RemoveAt(i);
             }
@@ -131,7 +160,23 @@ public sealed class DashboardViewModel : ObservableObject
             Processes.Add(row);
         }
 
-        ProcessesView.Refresh();
+        if (_lastViewResortTimestamp == 0 || now - _lastViewResortTimestamp >= ViewResortIntervalTicks)
+        {
+            _lastViewResortTimestamp = now;
+            ProcessesView.Refresh();
+        }
+
+        EnsureSelection();
+    }
+
+    private void EnsureSelection()
+    {
+        if (SelectedProcess is not null && ProcessesView.Contains(SelectedProcess))
+        {
+            return;
+        }
+
+        SelectedProcess = ProcessesView.Cast<ProcessRowViewModel>().FirstOrDefault();
     }
 
     private bool FilterProcess(object item)
@@ -174,7 +219,7 @@ public sealed class DashboardViewModel : ObservableObject
         var result = await _processActionService.KillAsync(process.ProcessId, entireTree, force, cancellationToken).ConfigureAwait(false);
         if (!result.Succeeded)
         {
-            System.Windows.Application.Current.Dispatcher.Invoke(() => _dialogService.ShowError("Process Action Failed", result.Message));
+            UiDispatch.Invoke(() => _dialogService.ShowError("Process Action Failed", result.Message));
         }
     }
 
@@ -188,7 +233,7 @@ public sealed class DashboardViewModel : ObservableObject
         var result = await _processActionService.SetPriorityAsync(process.ProcessId, priority, cancellationToken).ConfigureAwait(false);
         if (!result.Succeeded)
         {
-            System.Windows.Application.Current.Dispatcher.Invoke(() => _dialogService.ShowError("Priority Change Failed", result.Message));
+            UiDispatch.Invoke(() => _dialogService.ShowError("Priority Change Failed", result.Message));
         }
     }
 
@@ -202,7 +247,7 @@ public sealed class DashboardViewModel : ObservableObject
         var result = await _processActionService.SetCpuAffinityAsync(process.ProcessId, affinityMask, cancellationToken).ConfigureAwait(false);
         if (!result.Succeeded)
         {
-            System.Windows.Application.Current.Dispatcher.Invoke(() => _dialogService.ShowError("CPU Affinity Failed", result.Message));
+            UiDispatch.Invoke(() => _dialogService.ShowError("CPU Affinity Failed", result.Message));
         }
     }
 
@@ -228,7 +273,7 @@ public sealed class DashboardViewModel : ObservableObject
         var result = await _processActionService.SuspendAsync(process.ProcessId, force, cancellationToken).ConfigureAwait(false);
         if (!result.Succeeded)
         {
-            System.Windows.Application.Current.Dispatcher.Invoke(() => _dialogService.ShowError("Suspend Failed", result.Message));
+            UiDispatch.Invoke(() => _dialogService.ShowError("Suspend Failed", result.Message));
         }
     }
 
@@ -242,7 +287,7 @@ public sealed class DashboardViewModel : ObservableObject
         var result = await _processActionService.ResumeAsync(process.ProcessId, cancellationToken).ConfigureAwait(false);
         if (!result.Succeeded)
         {
-            System.Windows.Application.Current.Dispatcher.Invoke(() => _dialogService.ShowError("Resume Failed", result.Message));
+            UiDispatch.Invoke(() => _dialogService.ShowError("Resume Failed", result.Message));
         }
     }
 
@@ -256,7 +301,7 @@ public sealed class DashboardViewModel : ObservableObject
         var result = await _processActionService.OpenFileLocationAsync(process.ExecutablePath, cancellationToken).ConfigureAwait(false);
         if (!result.Succeeded)
         {
-            System.Windows.Application.Current.Dispatcher.Invoke(() => _dialogService.ShowWarning("Open File Location", result.Message));
+            UiDispatch.Invoke(() => _dialogService.ShowWarning("Open File Location", result.Message));
         }
     }
 
@@ -270,7 +315,7 @@ public sealed class DashboardViewModel : ObservableObject
         var result = await _processActionService.CopyPathAsync(process.ExecutablePath, cancellationToken).ConfigureAwait(false);
         if (!result.Succeeded)
         {
-            System.Windows.Application.Current.Dispatcher.Invoke(() => _dialogService.ShowWarning("Copy Path", result.Message));
+            UiDispatch.Invoke(() => _dialogService.ShowWarning("Copy Path", result.Message));
         }
     }
 

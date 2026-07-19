@@ -19,8 +19,8 @@ public sealed class SettingsViewModel : ObservableObject
     private bool _safeMode;
     private bool _enableNotifications;
     private bool _automaticRollbackProtection;
-    private string _theme = "Dark";
-    private string _accentColor = "#4CC2FF";
+    private string _theme = "Soft Graphite";
+    private string _accentColor = "#70B7FF";
     private int _maxLogEntries;
 
     public SettingsViewModel(
@@ -134,6 +134,14 @@ public sealed class SettingsViewModel : ObservableObject
 
     private async Task SaveAsync(CancellationToken cancellationToken)
     {
+        if (!IsValidAccentColor(AccentColor))
+        {
+            UiDispatch.Invoke(() => _dialogService.ShowError(
+                "Invalid Accent Color",
+                "Enter an opaque color such as #70B7FF."));
+            return;
+        }
+
         var settings = new AppSettings
         {
             RefreshIntervalMs = RefreshIntervalMs,
@@ -154,11 +162,24 @@ public sealed class SettingsViewModel : ObservableObject
         var startupResult = await _startupRegistrationService.SetEnabledAsync(settings.StartWithWindows, cancellationToken).ConfigureAwait(false);
         if (!startupResult.Succeeded)
         {
-            System.Windows.Application.Current.Dispatcher.Invoke(() => _dialogService.ShowError("Startup Registration Failed", startupResult.Message));
+            UiDispatch.Invoke(() => _dialogService.ShowError("Startup Registration Failed", startupResult.Message));
             return;
         }
 
         await _settingsService.SaveAsync(settings, cancellationToken).ConfigureAwait(false);
-        System.Windows.Application.Current.Dispatcher.Invoke(() => _dialogService.ShowInformation("Settings Saved", "Settings were saved locally and Windows startup registration is synced."));
+        UiDispatch.Invoke(() => _dialogService.ShowInformation("Settings Saved", "Settings were saved locally and Windows startup registration is synced."));
+    }
+
+    private static bool IsValidAccentColor(string? value)
+    {
+        try
+        {
+            return System.Windows.Media.ColorConverter.ConvertFromString(value) is System.Windows.Media.Color color &&
+                   color.A == byte.MaxValue;
+        }
+        catch (Exception exception) when (exception is FormatException or NotSupportedException or ArgumentException)
+        {
+            return false;
+        }
     }
 }

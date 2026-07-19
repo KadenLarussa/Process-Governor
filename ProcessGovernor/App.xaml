@@ -13,6 +13,9 @@
             <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter" />
             <converters:SeverityBrushConverter x:Key="SeverityBrushConverter" />
             <converters:BooleanLabelConverter x:Key="BoolLabelConverter" />
+            <converters:HexColorBrushConverter x:Key="HexColorBrushConverter" />
+            <converters:UsageHeatBrushConverter x:Key="UsageHeatBrushConverter" />
+            <converters:GpuEngineBrushConverter x:Key="GpuEngineBrushConverter" />
 
             <DataTemplate DataType="{x:Type viewModels:DashboardViewModel}">
                 <views:DashboardView />

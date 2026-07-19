@@ -5,43 +5,93 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
         Title="{Binding AppName}"
+        Icon="Assets/ProcessGovernor.png"
         Height="860"
         Width="1380"
         MinHeight="640"
         MinWidth="1040"
-        WindowStartupLocation="CenterScreen">
-    <Grid x:Name="RootShell" Background="{StaticResource WindowBrush}">
+        WindowStartupLocation="CenterScreen"
+        Opacity="0"
+        Loaded="Window_Loaded">
+    <Grid x:Name="RootShell"
+          Background="{StaticResource WindowBrush}"
+          RenderTransformOrigin="0.5,0.5">
+        <Grid.RenderTransform>
+            <ScaleTransform x:Name="ShellScale" ScaleX="0.992" ScaleY="0.992" />
+        </Grid.RenderTransform>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="230" />
+            <ColumnDefinition Width="248" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
         <Border x:Name="Sidebar"
                 Grid.Column="0"
-                Background="#111820"
+                Background="{StaticResource SidebarBrush}"
                 BorderBrush="{StaticResource BorderBrushSoft}"
                 BorderThickness="0,0,1,0"
-                Padding="16">
+                Padding="18">
             <DockPanel LastChildFill="True">
-                <StackPanel DockPanel.Dock="Top" Margin="0,0,0,20">
-                    <TextBlock Text="{Binding AppName}" FontSize="22" FontWeight="SemiBold" />
-                    <TextBlock Text="{Binding ElevationDisplay}" Foreground="{StaticResource MutedTextBrush}" Margin="0,4,0,0" />
-                </StackPanel>
+                <Grid DockPanel.Dock="Top" Margin="2,2,2,24">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="42" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Image Width="34"
+                           Height="34"
+                           HorizontalAlignment="Left"
+                           Source="Assets/ProcessGovernor.png"
+                           RenderOptions.BitmapScalingMode="HighQuality" />
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock Text="PROCESS" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" />
+                        <TextBlock Text="Governor" FontSize="19" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}" />
+                    </StackPanel>
+                </Grid>
+
+                <Border DockPanel.Dock="Bottom"
+                        Style="{StaticResource InsetBorder}"
+                        Margin="0,18,0,0"
+                        Padding="11,10">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="18" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Width="8"
+                                Height="8"
+                                Background="{StaticResource SuccessBrush}"
+                                CornerRadius="4"
+                                HorizontalAlignment="Left"
+                                VerticalAlignment="Top"
+                                Margin="1,5,0,0" />
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Local runtime" FontWeight="SemiBold" FontSize="12" />
+                            <TextBlock Text="{Binding ElevationDisplay}" Style="{StaticResource MutedText}" FontSize="11" Margin="0,2,0,0" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
 
                 <ListBox ItemsSource="{Binding NavigationItems}"
                          SelectedItem="{Binding SelectedNavigationItem}"
+                         ItemContainerStyle="{StaticResource NavigationListItemStyle}"
                          Margin="0,8,0,0">
                     <ListBox.ItemTemplate>
                         <DataTemplate>
                             <Grid>
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="28" />
+                                    <ColumnDefinition Width="34" />
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
-                                <Border Width="22" Height="22" CornerRadius="6" Background="#1D5269">
-                                    <TextBlock Text="{Binding Glyph}" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="SemiBold" />
-                                </Border>
-                                <TextBlock Grid.Column="1" Text="{Binding Title}" VerticalAlignment="Center" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding Glyph}"
+                                           FontFamily="Segoe Fluent Icons"
+                                           FontSize="16"
+                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
+                                           HorizontalAlignment="Left"
+                                           VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding Title}"
+                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
+                                           VerticalAlignment="Center"
+                                           FontWeight="SemiBold" />
                             </Grid>
                         </DataTemplate>
                     </ListBox.ItemTemplate>
@@ -51,7 +101,12 @@
 
         <ContentControl x:Name="PageHost"
                         Grid.Column="1"
-                        Content="{Binding CurrentPage}"
-                        Margin="22" />
+                        Content="{Binding CurrentPage, NotifyOnTargetUpdated=True}"
+                        TargetUpdated="PageHost_TargetUpdated"
+                        Margin="24">
+            <ContentControl.RenderTransform>
+                <TranslateTransform x:Name="PageTranslate" />
+            </ContentControl.RenderTransform>
+        </ContentControl>
     </Grid>
 </Window>

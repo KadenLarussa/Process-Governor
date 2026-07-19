@@ -66,19 +66,19 @@ public sealed class LogsViewModel : ObservableObject
     public async Task LoadAsync(CancellationToken cancellationToken = default)
     {
         var entries = await _loggingService.GetEntriesAsync(cancellationToken).ConfigureAwait(false);
-        await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+        await UiDispatch.InvokeAsync(() =>
         {
             Entries.Clear();
             foreach (var entry in entries)
             {
                 Entries.Add(entry);
             }
-        });
+        }).ConfigureAwait(false);
     }
 
     private void OnEntryAdded(object? sender, LogEntry entry)
     {
-        System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+        _ = UiDispatch.InvokeAsync(() =>
         {
             Entries.Add(entry);
             LogsView.Refresh();
@@ -121,4 +121,5 @@ public sealed class LogsViewModel : ObservableObject
         var path = _paths.GetLogPath($"events-export-{DateTime.Now:yyyyMMdd-HHmmss}.csv");
         return _loggingService.ExportCsvAsync(path, cancellationToken);
     }
+
 }
