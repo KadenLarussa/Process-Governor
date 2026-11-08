@@ -22,6 +22,7 @@ public sealed class SettingsViewModel : ObservableObject
     private string _theme = "Soft Graphite";
     private string _accentColor = "#70B7FF";
     private int _maxLogEntries;
+    private string _saveStatus = string.Empty;
 
     public SettingsViewModel(
         ISettingsService settingsService,
@@ -36,6 +37,12 @@ public sealed class SettingsViewModel : ObservableObject
     }
 
     public AsyncRelayCommand SaveCommand { get; }
+
+    public string SaveStatus
+    {
+        get => _saveStatus;
+        private set => SetProperty(ref _saveStatus, value);
+    }
 
     public int RefreshIntervalMs
     {
@@ -134,6 +141,7 @@ public sealed class SettingsViewModel : ObservableObject
 
     private async Task SaveAsync(CancellationToken cancellationToken)
     {
+        SaveStatus = string.Empty;
         if (!IsValidAccentColor(AccentColor))
         {
             UiDispatch.Invoke(() => _dialogService.ShowError(
@@ -166,8 +174,15 @@ public sealed class SettingsViewModel : ObservableObject
             return;
         }
 
-        await _settingsService.SaveAsync(settings, cancellationToken).ConfigureAwait(false);
-        UiDispatch.Invoke(() => _dialogService.ShowInformation("Settings Saved", "Settings were saved locally and Windows startup registration is synced."));
+        try
+        {
+            await _settingsService.SaveAsync(settings, cancellationToken);
+            await UiDispatch.InvokeAsync(() => SaveStatus = "Settings saved");
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            await UiDispatch.InvokeAsync(() => _dialogService.ShowError("Could not save settings", exception.Message));
+        }
     }
 
     private static bool IsValidAccentColor(string? value)

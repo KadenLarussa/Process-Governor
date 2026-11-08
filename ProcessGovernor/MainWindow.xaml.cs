@@ -61,10 +61,10 @@ public partial class MainWindow : Window
         var ease = new QuadraticEase { EasingMode = EasingMode.EaseOut };
         PageHost.BeginAnimation(
             OpacityProperty,
-            new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(170)) { EasingFunction = ease });
+            new DoubleAnimation(0.65, 1, TimeSpan.FromMilliseconds(140)) { EasingFunction = ease, FillBehavior = FillBehavior.Stop });
         PageTranslate.BeginAnimation(
             System.Windows.Media.TranslateTransform.YProperty,
-            new DoubleAnimation(8, 0, TimeSpan.FromMilliseconds(190)) { EasingFunction = ease });
+            new DoubleAnimation(4, 0, TimeSpan.FromMilliseconds(160)) { EasingFunction = ease, FillBehavior = FillBehavior.Stop });
     }
 
     private void OnSettingsChanged(object? sender, AppSettings settings)

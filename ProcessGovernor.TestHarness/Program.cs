@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.IO;
 using ProcessGovernor.Core;
 using ProcessGovernor.Infrastructure;
 using ProcessGovernor.Models;
@@ -7,22 +8,57 @@ using ProcessGovernor.ViewModels;
 
 namespace ProcessGovernor.TestHarness;
 
-internal static class Program
+internal static partial class Program
 {
-    private static async Task<int> Main()
+    private static async Task<int> Main(string[] args)
     {
         var runner = new TestRunner();
         await runner.RunAsync("JSON persistence round-trips typed settings", JsonPersistenceRoundTripsAsync);
         await runner.RunAsync("Legacy appearance defaults migrate safely", LegacyAppearanceDefaultsMigrateAsync);
         await runner.RunAsync("Default automations and profiles are created", DefaultAutomationStoreCreatesPresetsAsync);
+        await runner.RunAsync("Rule and profile updates preserve each other's changes", AutomationEditsAreIsolatedAsync);
         await runner.RunAsync("Rule evaluation handles process, threshold, and window triggers", RuleEvaluationMatchesExpectedTriggers);
         await runner.RunAsync("Startup diagnostics completes without fatal failures", StartupDiagnosticsCompletesAsync);
         await runner.RunAsync("GPU metrics service never fakes or throws", GpuMetricsServiceIsSafe);
         await runner.RunAsync("Process actions work on a disposable child process", ProcessActionsWorkOnChildProcessAsync);
         await runner.RunAsync("Process monitor idle CPU stays under budget", ProcessMonitorIdleCpuStaysUnderBudgetAsync);
+        await runner.RunAsync("WPF navigation and editors work at minimum and default sizes",
+            () => SmokeTestUiAsync(args.FirstOrDefault()));
 
         runner.WriteSummary();
         return runner.FailedCount == 0 ? 0 : 1;
+    }
+
+    private static async Task AutomationEditsAreIsolatedAsync()
+    {
+        var root = CreateTestRoot();
+        try
+        {
+            var persistence = new RulePersistenceService(new AppPaths(root), new JsonFileStore());
+            var token = CancellationToken.None;
+            var defaults = await persistence.LoadAsync(token);
+            var removedRule = defaults.Rules.First();
+            var rule = new AutomationRule { Name = "Custom rule", DryRun = true };
+            var profile = new AutomationProfile { Name = "Custom profile", RuleIds = [removedRule.Id] };
+
+            await Task.WhenAll(
+                persistence.UpdateAsync(store =>
+                {
+                    store.Rules.RemoveAll(item => item.Id == removedRule.Id);
+                    store.Rules.Add(rule);
+                }, token),
+                persistence.UpdateAsync(store => store.Profiles.Add(profile), token));
+
+            var actual = await persistence.LoadAsync(token);
+            Assert.True(actual.Rules.Any(item => item.Id == rule.Id), "A profile write must not overwrite new rules.");
+            Assert.True(actual.Rules.All(item => item.Name != removedRule.Name), "A deleted preset must stay deleted.");
+            Assert.True(actual.Profiles.Any(item => item.Id == profile.Id), "A rule write must not overwrite new profiles.");
+            Assert.True(actual.Profiles.All(item => !item.RuleIds.Contains(removedRule.Id)), "Deleted rules must not remain assigned.");
+        }
+        finally
+        {
+            DeleteTestRoot(root);
+        }
     }
 
     private static async Task JsonPersistenceRoundTripsAsync()
@@ -305,7 +341,7 @@ internal static class Program
         }
     }
 
-    private static AppServiceProvider BuildProvider(string root)
+    private static AppServiceProvider BuildProvider(string root, IDialogService? dialogs = null)
         => new ServiceRegistry()
             .AddSingleton(_ => new AppPaths(root))
             .AddSingleton<IJsonFileStore, JsonFileStore>()
@@ -324,7 +360,7 @@ internal static class Program
             .AddSingleton<IStartupDiagnosticsService, StartupDiagnosticsService>()
             .AddSingleton<INotificationService, NotificationService>()
             .AddSingleton<IElevationService, ElevationService>()
-            .AddSingleton<IDialogService, DialogService>()
+            .AddSingleton<IDialogService>(_ => dialogs ?? new DialogService())
             .AddSingleton<MainViewModel>()
             .AddSingleton<DashboardViewModel>()
             .AddSingleton<AutomationsViewModel>()

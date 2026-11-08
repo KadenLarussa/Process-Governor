@@ -88,7 +88,7 @@ public interface IRulePersistenceService
 {
     Task<AutomationStoreFile> LoadAsync(CancellationToken cancellationToken);
 
-    Task SaveAsync(AutomationStoreFile store, CancellationToken cancellationToken);
+    Task UpdateAsync(Action<AutomationStoreFile> update, CancellationToken cancellationToken);
 }
 
 public interface IRuleEvaluationService
@@ -154,6 +154,8 @@ public interface IElevationService
 
 public interface IDialogService
 {
+    string? PickExecutable();
+
     bool Confirm(string title, string message);
 
     void ShowInformation(string title, string message);

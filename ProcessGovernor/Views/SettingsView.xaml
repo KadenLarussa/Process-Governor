@@ -10,22 +10,26 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <StackPanel Grid.Row="0" Margin="0,0,0,16">
-            <TextBlock Text="Settings" Style="{StaticResource PageTitle}" />
-            <TextBlock Text="Local-only behavior, refresh cadence, tray behavior, notifications, and rollback safety." Style="{StaticResource MutedText}" />
-        </StackPanel>
+        <DockPanel Margin="0,0,0,20">
+            <Button DockPanel.Dock="Right" Content="Save settings" Style="{StaticResource AccentButton}"
+                    Command="{Binding SaveCommand}" VerticalAlignment="Center" />
+            <StackPanel>
+                <TextBlock Text="Settings" Style="{StaticResource PageTitle}" />
+                <TextBlock Text="{Binding SaveStatus}" Style="{StaticResource MutedText}" AutomationProperties.LiveSetting="Polite" />
+            </StackPanel>
+        </DockPanel>
 
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
             <StackPanel>
-                <Border Style="{StaticResource CardBorder}" Margin="0,0,0,14">
+                <Border BorderBrush="{StaticResource BorderBrushSoft}" BorderThickness="0,0,0,1" Padding="0,0,0,16" Margin="0,0,0,16">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="220" />
-                            <ColumnDefinition Width="220" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Row="0" Grid.ColumnSpan="3" Text="Monitoring cadence" Style="{StaticResource SectionTitle}" />
@@ -44,7 +48,7 @@
                     </Grid>
                 </Border>
 
-                <Border Style="{StaticResource CardBorder}" Margin="0,0,0,14">
+                <Border BorderBrush="{StaticResource BorderBrushSoft}" BorderThickness="0,0,0,1" Padding="0,0,0,10" Margin="0,0,0,16">
                     <StackPanel>
                         <TextBlock Text="Behavior and safety" Style="{StaticResource SectionTitle}" />
                         <WrapPanel>
@@ -100,7 +104,7 @@
                     </StackPanel>
                 </Border>
 
-                <Border Style="{StaticResource CardBorder}" Margin="0,0,0,14">
+                <Border Margin="0,0,0,14">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
@@ -114,7 +118,7 @@
                         <TextBlock Grid.Row="0" Grid.ColumnSpan="3" Text="Appearance" Style="{StaticResource SectionTitle}" />
                         <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,14,0">
                             <TextBlock Text="Theme" Style="{StaticResource FieldLabel}" />
-                            <TextBox Text="{Binding Theme}" IsReadOnly="True" ToolTip="Process Governor currently ships one carefully tuned dark theme." />
+                            <TextBlock Text="{Binding Theme}" VerticalAlignment="Center" Margin="0,8,0,0" />
                         </StackPanel>
                         <Grid Grid.Row="1" Grid.Column="1" Margin="0,0,14,0">
                             <Grid.ColumnDefinitions>
@@ -135,13 +139,6 @@
                                     CornerRadius="6"
                                     ToolTip="Accent preview" />
                         </Grid>
-                        <Button Grid.Row="1"
-                                Grid.Column="2"
-                                Content="Save Settings"
-                                Style="{StaticResource AccentButton}"
-                                Command="{Binding SaveCommand}"
-                                HorizontalAlignment="Left"
-                                VerticalAlignment="Bottom" />
                     </Grid>
                 </Border>
             </StackPanel>

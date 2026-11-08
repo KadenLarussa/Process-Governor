@@ -79,6 +79,8 @@ Run the local functionality harness:
 dotnet run --project .\ProcessGovernor.TestHarness\ProcessGovernor.TestHarness.csproj
 ```
 
+The harness also opens the WPF shell with temporary data and the automation engine stopped. To capture screenshots of every page at minimum and default window sizes, append `-- .\artifacts\ui-smoke` to the command.
+
 Publish a self-contained folder build:
 
 ```powershell

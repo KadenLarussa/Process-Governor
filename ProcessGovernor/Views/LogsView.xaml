@@ -9,11 +9,11 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <StackPanel Grid.Row="0" Margin="0,0,0,16">
             <TextBlock Text="Logs" Style="{StaticResource PageTitle}" />
-            <TextBlock Text="Search automation triggers, actions, errors, rollbacks, and elevation-related failures." Style="{StaticResource MutedText}" />
         </StackPanel>
 
         <Grid Grid.Row="1" Margin="0,0,0,12">
@@ -29,7 +29,8 @@
             </StackPanel>
             <StackPanel Grid.Column="1" Margin="0,0,10,0">
                 <TextBlock Text="Search" Foreground="{StaticResource MutedTextBrush}" />
-                <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" Margin="0,5,0,0" />
+                <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged, Delay=120}" Margin="0,5,0,0"
+                         AutomationProperties.Name="Search logs" />
             </StackPanel>
             <Button Grid.Column="2" Content="Export JSON" Command="{Binding ExportJsonCommand}" Margin="0,19,8,0" />
             <Button Grid.Column="3" Content="Export CSV" Command="{Binding ExportCsvCommand}" Margin="0,19,0,0" />
@@ -37,22 +38,32 @@
 
         <DataGrid Grid.Row="2"
                   ItemsSource="{Binding LogsView}"
+                  SelectedItem="{Binding SelectedEntry}"
+                  SelectionMode="Single"
                   AutoGenerateColumns="False"
                   IsReadOnly="True">
             <DataGrid.Columns>
-                <DataGridTextColumn Header="Time" Binding="{Binding LocalTimestamp}" Width="155" />
+                <DataGridTextColumn Header="Time" Binding="{Binding LocalTimestamp}" Width="155" ElementStyle="{StaticResource TableText}" />
                 <DataGridTemplateColumn Header="Severity" SortMemberPath="Severity" Width="110">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <TextBlock Text="{Binding Severity}" Foreground="{Binding Severity, Converter={StaticResource SeverityBrushConverter}}" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding Severity}" Foreground="{Binding Severity, Converter={StaticResource SeverityBrushConverter}}"
+                                       Style="{StaticResource TableText}" FontWeight="SemiBold" />
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTextColumn Header="Source" Binding="{Binding Source}" Width="190" />
-                <DataGridTextColumn Header="PID" Binding="{Binding ProcessId}" Width="80" />
-                <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="*" />
-                <DataGridTextColumn Header="Details" Binding="{Binding Details}" Width="280" />
+                <DataGridTextColumn Header="Source" Binding="{Binding Source}" Width="165" ElementStyle="{StaticResource TableText}" />
+                <DataGridTextColumn Header="PID" Binding="{Binding ProcessId}" Width="65" ElementStyle="{StaticResource TableText}" />
+                <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="*" MinWidth="180" ElementStyle="{StaticResource TableText}" />
             </DataGrid.Columns>
         </DataGrid>
+        <Border Grid.Row="3" Margin="0,12,0,0" Padding="12" Style="{StaticResource InsetBorder}">
+            <StackPanel>
+                <TextBlock Text="Event details" Style="{StaticResource SectionTitle}" />
+                <TextBox Text="{Binding SelectedEntryDetails, Mode=OneWay}" IsReadOnly="True"
+                         Height="78" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
+                         AutomationProperties.Name="Selected log entry details" />
+            </StackPanel>
+        </Border>
     </Grid>
 </UserControl>

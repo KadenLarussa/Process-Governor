@@ -55,6 +55,11 @@ public sealed class MainViewModel : ObservableObject
         {
             if (SetProperty(ref _selectedNavigationItem, value))
             {
+                if (ReferenceEquals(value?.ViewModel, _profilesViewModel))
+                {
+                    _profilesViewModel.UpdateRuleCatalog(_automationsViewModel.Rules.Select(rule => rule.Model));
+                }
+
                 CurrentPage = value?.ViewModel;
             }
         }

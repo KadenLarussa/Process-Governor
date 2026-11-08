@@ -10,6 +10,7 @@ public sealed class RulePersistenceService : IRulePersistenceService
     private const string LegacyFocusedRuleName = "Focused Performance: high-load app boost";
     private readonly AppPaths _paths;
     private readonly IJsonFileStore _store;
+    private readonly SemaphoreSlim _gate = new(1, 1);
 
     public RulePersistenceService(AppPaths paths, IJsonFileStore store)
     {
@@ -19,22 +20,55 @@ public sealed class RulePersistenceService : IRulePersistenceService
 
     public async Task<AutomationStoreFile> LoadAsync(CancellationToken cancellationToken)
     {
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            return await LoadCoreAsync(cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    private async Task<AutomationStoreFile> LoadCoreAsync(CancellationToken cancellationToken)
+    {
         var path = _paths.GetConfigPath("automations.json");
         var exists = File.Exists(path);
         var file = await _store.LoadAsync(path, CreateDefaultStore, cancellationToken).ConfigureAwait(false);
-        var changed = EnsureDefaultPresets(file);
+        var changed = false;
+        RenameLegacyRule(file, LegacyFocusedRuleName, SafePcBoostRuleName, ref changed);
+        MergeLegacyProfile(file, "Focused Performance", "Safe PC Boost", ref changed);
         changed |= RemoveRetiredDefaultRules(file);
 
         if (!exists || changed)
         {
-            await SaveAsync(file, cancellationToken).ConfigureAwait(false);
+            await _store.SaveAsync(path, file, cancellationToken).ConfigureAwait(false);
         }
 
         return file;
     }
 
-    public Task SaveAsync(AutomationStoreFile store, CancellationToken cancellationToken)
-        => _store.SaveAsync(_paths.GetConfigPath("automations.json"), store, cancellationToken);
+    public async Task UpdateAsync(Action<AutomationStoreFile> update, CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var file = await LoadCoreAsync(cancellationToken).ConfigureAwait(false);
+            update(file);
+            var ruleIds = file.Rules.Select(rule => rule.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            foreach (var profile in file.Profiles)
+            {
+                profile.RuleIds.RemoveAll(id => !ruleIds.Contains(id));
+            }
+
+            await _store.SaveAsync(_paths.GetConfigPath("automations.json"), file, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
 
     private static AutomationStoreFile CreateDefaultStore()
     {

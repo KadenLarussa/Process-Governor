@@ -65,7 +65,7 @@ public sealed class AsyncRelayCommand : ICommand
         try
         {
             IsExecuting = true;
-            await _execute(parameter, _executionCancellation.Token).ConfigureAwait(false);
+            await _execute(parameter, _executionCancellation.Token);
         }
         finally
         {

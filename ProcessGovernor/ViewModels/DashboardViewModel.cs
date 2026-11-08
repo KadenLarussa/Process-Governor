@@ -63,8 +63,18 @@ public sealed class DashboardViewModel : ObservableObject
     public ProcessRowViewModel? SelectedProcess
     {
         get => _selectedProcess;
-        set => SetProperty(ref _selectedProcess, value);
+        set
+        {
+            if (SetProperty(ref _selectedProcess, value))
+            {
+                OnPropertyChanged(nameof(HasSelectedProcess));
+            }
+        }
     }
+
+    public bool HasSelectedProcess => SelectedProcess is not null;
+
+    public bool HoldProcessOrder { get; set; }
 
     public AsyncRelayCommand KillProcessCommand { get; }
 
@@ -160,10 +170,15 @@ public sealed class DashboardViewModel : ObservableObject
             Processes.Add(row);
         }
 
-        if (_lastViewResortTimestamp == 0 || now - _lastViewResortTimestamp >= ViewResortIntervalTicks)
+        if (!HoldProcessOrder && (_lastViewResortTimestamp == 0 || now - _lastViewResortTimestamp >= ViewResortIntervalTicks))
         {
             _lastViewResortTimestamp = now;
+            var selected = SelectedProcess;
             ProcessesView.Refresh();
+            if (selected is not null && ProcessesView.Contains(selected))
+            {
+                SelectedProcess = selected;
+            }
         }
 
         EnsureSelection();

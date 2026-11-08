@@ -15,12 +15,14 @@
         Loaded="Window_Loaded">
     <Grid x:Name="RootShell"
           Background="{StaticResource WindowBrush}"
+          UseLayoutRounding="True"
+          SnapsToDevicePixels="True"
           RenderTransformOrigin="0.5,0.5">
         <Grid.RenderTransform>
             <ScaleTransform x:Name="ShellScale" ScaleX="0.992" ScaleY="0.992" />
         </Grid.RenderTransform>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="248" />
+            <ColumnDefinition Width="184" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
@@ -64,8 +66,7 @@
                                 VerticalAlignment="Top"
                                 Margin="1,5,0,0" />
                         <StackPanel Grid.Column="1">
-                            <TextBlock Text="Local runtime" FontWeight="SemiBold" FontSize="12" />
-                            <TextBlock Text="{Binding ElevationDisplay}" Style="{StaticResource MutedText}" FontSize="11" Margin="0,2,0,0" />
+                            <TextBlock Text="{Binding ElevationDisplay}" Style="{StaticResource MutedText}" FontSize="11" />
                         </StackPanel>
                     </Grid>
                 </Border>

@@ -14,6 +14,7 @@ public sealed class LogsViewModel : ObservableObject
     private readonly AppPaths _paths;
     private string _searchText = string.Empty;
     private string _severityFilter = "All";
+    private LogEntry? _selectedEntry;
 
     public LogsViewModel(ILoggingService loggingService, AppPaths paths)
     {
@@ -32,6 +33,22 @@ public sealed class LogsViewModel : ObservableObject
     public ObservableCollection<LogEntry> Entries { get; } = [];
 
     public ICollectionView LogsView { get; }
+
+    public LogEntry? SelectedEntry
+    {
+        get => _selectedEntry;
+        set
+        {
+            if (SetProperty(ref _selectedEntry, value))
+            {
+                OnPropertyChanged(nameof(SelectedEntryDetails));
+            }
+        }
+    }
+
+    public string SelectedEntryDetails => SelectedEntry is { } entry
+        ? string.IsNullOrWhiteSpace(entry.Details) ? entry.Message : $"{entry.Message}{Environment.NewLine}{entry.Details}"
+        : "Select a log entry.";
 
     public IReadOnlyList<string> SeverityOptions { get; } = ["All", "Trace", "Information", "Warning", "Error"];
 
@@ -81,7 +98,6 @@ public sealed class LogsViewModel : ObservableObject
         _ = UiDispatch.InvokeAsync(() =>
         {
             Entries.Add(entry);
-            LogsView.Refresh();
         });
     }
 

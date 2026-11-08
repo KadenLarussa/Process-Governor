@@ -9,15 +9,19 @@ public sealed class ProfilesViewModel : ObservableObject
 {
     private readonly IRulePersistenceService _rulePersistenceService;
     private readonly IAutomationEngine _automationEngine;
-    private AutomationStoreFile _store = new();
+    private readonly IDialogService _dialogService;
+    private IReadOnlyList<AutomationRule> _rules = [];
     private AutomationProfile? _selectedProfile;
-    private string _newProfileName = "New Profile";
+    private string _newProfileName = string.Empty;
     private int _temporaryOverrideMinutes = 30;
+    private bool _isSaving;
+    private string _saveStatus = string.Empty;
 
-    public ProfilesViewModel(IRulePersistenceService rulePersistenceService, IAutomationEngine automationEngine)
+    public ProfilesViewModel(IRulePersistenceService rulePersistenceService, IAutomationEngine automationEngine, IDialogService dialogService)
     {
         _rulePersistenceService = rulePersistenceService;
         _automationEngine = automationEngine;
+        _dialogService = dialogService;
         AddProfileCommand = new AsyncRelayCommand(AddProfileAsync);
         DeleteProfileCommand = new AsyncRelayCommand(DeleteProfileAsync, () => SelectedProfile is not null);
         ActivateProfileCommand = new AsyncRelayCommand(ActivateProfileAsync, () => SelectedProfile is not null);
@@ -56,12 +60,30 @@ public sealed class ProfilesViewModel : ObservableObject
                 ActivateProfileCommand.RaiseCanExecuteChanged();
                 ActivateTemporaryCommand.RaiseCanExecuteChanged();
                 RefreshRuleAssignments();
-                OnPropertyChanged(nameof(SelectedProfileName));
+                OnPropertyChanged(nameof(HasSelection));
             }
         }
     }
 
-    public string SelectedProfileName => SelectedProfile?.Name ?? "Select a profile";
+    public bool HasSelection => SelectedProfile is not null;
+
+    public bool IsSaving
+    {
+        get => _isSaving;
+        private set => SetProperty(ref _isSaving, value);
+    }
+
+    public string SaveStatus
+    {
+        get => _saveStatus;
+        private set => SetProperty(ref _saveStatus, value);
+    }
+
+    public void UpdateRuleCatalog(IEnumerable<AutomationRule> rules)
+    {
+        _rules = rules.ToList();
+        RefreshRuleAssignments();
+    }
 
     public string NewProfileName
     {
@@ -77,12 +99,13 @@ public sealed class ProfilesViewModel : ObservableObject
 
     public async Task LoadAsync(CancellationToken cancellationToken = default)
     {
-        _store = await _rulePersistenceService.LoadAsync(cancellationToken).ConfigureAwait(false);
+        var store = await _rulePersistenceService.LoadAsync(cancellationToken).ConfigureAwait(false);
         var selectedProfileId = SelectedProfile?.Id;
         await UiDispatch.InvokeAsync(() =>
         {
+            _rules = store.Rules;
             Profiles.Clear();
-            foreach (var profile in _store.Profiles.OrderBy(static profile => profile.PriorityOrder).ThenBy(static profile => profile.Name))
+            foreach (var profile in store.Profiles.OrderBy(static profile => profile.PriorityOrder).ThenBy(static profile => profile.Name))
             {
                 Profiles.Add(profile);
             }
@@ -99,9 +122,12 @@ public sealed class ProfilesViewModel : ObservableObject
             PriorityOrder = Profiles.Count == 0 ? 10 : Profiles.Max(static item => item.PriorityOrder) + 10
         };
 
-        _store.Profiles.Add(profile);
-        Profiles.Add(profile);
-        await SaveAsync(cancellationToken).ConfigureAwait(false);
+        if (await SaveProfilesAsync(Profiles.Append(profile).ToList(), cancellationToken))
+        {
+            Profiles.Add(profile);
+            SelectedProfile = profile;
+            NewProfileName = string.Empty;
+        }
     }
 
     private async Task DeleteProfileAsync(CancellationToken cancellationToken)
@@ -112,45 +138,46 @@ public sealed class ProfilesViewModel : ObservableObject
         }
 
         var selected = SelectedProfile;
-        _store.Profiles.RemoveAll(profile => profile.Id == selected.Id);
-        await UiDispatch.InvokeAsync(() => Profiles.Remove(selected));
-        SelectedProfile = null;
-        await SaveAsync(cancellationToken).ConfigureAwait(false);
+        if (_dialogService.Confirm("Delete profile", $"Delete '{selected.Name}'? Its automation rules will be kept.")
+            && await SaveProfilesAsync(Profiles.Where(profile => profile != selected).ToList(), cancellationToken))
+        {
+            Profiles.Remove(selected);
+            SelectedProfile = Profiles.FirstOrDefault();
+        }
     }
 
     private async Task ActivateProfileAsync(CancellationToken cancellationToken)
     {
-        if (SelectedProfile is null)
+        if (SelectedProfile is not { Enabled: true } selected)
         {
+            _dialogService.ShowWarning("Profile is disabled", "Enable the profile before activating it.");
             return;
         }
 
         foreach (var profile in Profiles)
         {
-            profile.IsActive = profile.Id == SelectedProfile.Id;
+            profile.IsActive = profile.Id == selected.Id;
             profile.TemporaryOverrideUntilUtc = null;
         }
 
-        await SaveAsync(cancellationToken).ConfigureAwait(false);
-        await LoadAsync(cancellationToken).ConfigureAwait(false);
+        await SaveAndRefreshAsync(cancellationToken);
     }
 
     private async Task ActivateTemporaryAsync(CancellationToken cancellationToken)
     {
-        if (SelectedProfile is null)
+        if (SelectedProfile is not { Enabled: true } selected)
         {
+            _dialogService.ShowWarning("Profile is disabled", "Enable the profile before activating it.");
             return;
         }
 
         var until = DateTimeOffset.UtcNow.AddMinutes(TemporaryOverrideMinutes);
         foreach (var profile in Profiles)
         {
-            profile.IsActive = false;
-            profile.TemporaryOverrideUntilUtc = profile.Id == SelectedProfile.Id ? until : null;
+            profile.TemporaryOverrideUntilUtc = profile.Id == selected.Id ? until : null;
         }
 
-        await SaveAsync(cancellationToken).ConfigureAwait(false);
-        await LoadAsync(cancellationToken).ConfigureAwait(false);
+        await SaveAndRefreshAsync(cancellationToken);
     }
 
     private async Task ClearActiveProfilesAsync(CancellationToken cancellationToken)
@@ -161,15 +188,51 @@ public sealed class ProfilesViewModel : ObservableObject
             profile.TemporaryOverrideUntilUtc = null;
         }
 
-        await SaveAsync(cancellationToken).ConfigureAwait(false);
-        await LoadAsync(cancellationToken).ConfigureAwait(false);
+        await SaveAndRefreshAsync(cancellationToken);
     }
 
-    private async Task SaveAsync(CancellationToken cancellationToken)
+    private Task SaveAsync(CancellationToken cancellationToken) => SaveAndRefreshAsync(cancellationToken);
+
+    private async Task SaveAndRefreshAsync(CancellationToken cancellationToken)
     {
-        _store.Profiles = Profiles.ToList();
-        await _rulePersistenceService.SaveAsync(_store, cancellationToken).ConfigureAwait(false);
-        await _automationEngine.ReloadRulesAsync(cancellationToken).ConfigureAwait(false);
+        if (await SaveProfilesAsync(Profiles.ToList(), cancellationToken))
+        {
+            await LoadAsync(cancellationToken);
+        }
+    }
+
+    private async Task<bool> SaveProfilesAsync(List<AutomationProfile> profiles, CancellationToken cancellationToken)
+    {
+        IsSaving = true;
+        try
+        {
+            SaveStatus = "Saving profiles...";
+            var snapshot = profiles.Select(profile => new AutomationProfile
+            {
+                Id = profile.Id,
+                Name = profile.Name,
+                Enabled = profile.Enabled,
+                IsActive = profile.IsActive,
+                AutoActivateProcessName = profile.AutoActivateProcessName,
+                PriorityOrder = profile.PriorityOrder,
+                TemporaryOverrideUntilUtc = profile.TemporaryOverrideUntilUtc,
+                RuleIds = [.. profile.RuleIds]
+            }).ToList();
+            await _rulePersistenceService.UpdateAsync(store => store.Profiles = snapshot, cancellationToken);
+            await _automationEngine.ReloadRulesAsync(cancellationToken);
+            SaveStatus = "Profiles saved";
+            return true;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or System.Text.Json.JsonException)
+        {
+            SaveStatus = "Could not save profiles";
+            _dialogService.ShowWarning("Profiles", exception.Message);
+            return false;
+        }
+        finally
+        {
+            IsSaving = false;
+        }
     }
 
     private void RefreshRuleAssignments()
@@ -180,7 +243,7 @@ public sealed class ProfilesViewModel : ObservableObject
             return;
         }
 
-        foreach (var rule in _store.Rules.OrderBy(static rule => rule.Name))
+        foreach (var rule in _rules.OrderBy(static rule => rule.Name))
         {
             RuleAssignments.Add(new ProfileRuleAssignmentViewModel(SelectedProfile, rule));
         }

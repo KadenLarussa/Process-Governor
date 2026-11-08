@@ -1,12 +1,14 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using System.Windows.Media.Animation;
+using ProcessGovernor.ViewModels;
 
 namespace ProcessGovernor.Views;
 
 public partial class DashboardView : System.Windows.Controls.UserControl
 {
+    private bool _contextMenuOpen;
+
     public DashboardView()
     {
         InitializeComponent();
@@ -16,40 +18,44 @@ public partial class DashboardView : System.Windows.Controls.UserControl
     {
         if (sender is DataGridRow row)
         {
-            row.IsSelected = true;
+            ProcessGrid.SelectedItems.Clear();
+            ProcessGrid.SelectedItem = row.Item;
             row.Focus();
         }
     }
 
-    private void ProcessGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void ProcessGrid_MouseEnter(object sender, System.Windows.Input.MouseEventArgs e) => UpdateOrderHold();
+
+    private void ProcessGrid_MouseLeave(object sender, System.Windows.Input.MouseEventArgs e) => UpdateOrderHold();
+
+    private void ProcessGrid_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e) => UpdateOrderHold();
+
+    private void ProcessGrid_ContextMenuOpening(object sender, ContextMenuEventArgs e)
     {
-        if (!IsLoaded)
+        _contextMenuOpen = true;
+        UpdateOrderHold();
+    }
+
+    private void ProcessGrid_ContextMenuClosing(object sender, ContextMenuEventArgs e)
+    {
+        _contextMenuOpen = false;
+        UpdateOrderHold();
+    }
+
+    private void ProcessGrid_Unloaded(object sender, RoutedEventArgs e)
+    {
+        _contextMenuOpen = false;
+        if (DataContext is DashboardViewModel viewModel)
         {
-            return;
+            viewModel.HoldProcessOrder = false;
         }
+    }
 
-        ProcessInspector.BeginAnimation(OpacityProperty, null);
-        InspectorTranslate.BeginAnimation(System.Windows.Media.TranslateTransform.YProperty, null);
-        ProcessInspector.Opacity = 1;
-        InspectorTranslate.Y = 0;
-
-        if (!SystemParameters.ClientAreaAnimation)
+    private void UpdateOrderHold()
+    {
+        if (DataContext is DashboardViewModel viewModel)
         {
-            return;
+            viewModel.HoldProcessOrder = _contextMenuOpen || ProcessGrid.IsMouseOver || ProcessGrid.SelectedItems.Count > 1;
         }
-
-        var easing = new QuadraticEase { EasingMode = EasingMode.EaseOut };
-        ProcessInspector.BeginAnimation(
-            OpacityProperty,
-            new DoubleAnimation(0.68, 1, TimeSpan.FromMilliseconds(150))
-            {
-                EasingFunction = easing
-            });
-        InspectorTranslate.BeginAnimation(
-            System.Windows.Media.TranslateTransform.YProperty,
-            new DoubleAnimation(5, 0, TimeSpan.FromMilliseconds(170))
-            {
-                EasingFunction = easing
-            });
     }
 }

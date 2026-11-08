@@ -544,7 +544,6 @@ public sealed class AutomationEngine : IAutomationEngine, IDisposable
         if (activeProfile is null)
         {
             var profiledRuleIds = _store.Profiles
-                .Where(static profile => profile.Enabled)
                 .SelectMany(static profile => profile.RuleIds)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
             return enabledRules.Where(rule => !profiledRuleIds.Contains(rule.Id)).ToList();
@@ -559,7 +558,9 @@ public sealed class AutomationEngine : IAutomationEngine, IDisposable
         var now = DateTimeOffset.UtcNow;
         var activeProfile = _store.Profiles
             .Where(profile => profile.Enabled && IsProfileActive(profile, batch, now))
-            .OrderBy(static profile => profile.PriorityOrder)
+            .OrderByDescending(profile => profile.TemporaryOverrideUntilUtc > now)
+            .ThenByDescending(static profile => profile.IsActive)
+            .ThenBy(static profile => profile.PriorityOrder)
             .ThenBy(static profile => profile.Name)
             .FirstOrDefault();
 

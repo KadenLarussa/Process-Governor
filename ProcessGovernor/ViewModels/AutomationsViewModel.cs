@@ -9,15 +9,15 @@ namespace ProcessGovernor.ViewModels;
 public sealed class AutomationsViewModel : ObservableObject
 {
     private const string SafePcBoostRuleName = "Safe PC Boost: busy app helper";
-    private const string SafePcBoostProfileName = "Safe PC Boost";
-    private const string LegacyFocusedRuleName = "Focused Performance: high-load app boost";
-    private const string LegacyFocusedProfileName = "Focused Performance";
     private readonly IRulePersistenceService _rulePersistenceService;
     private readonly IAutomationEngine _automationEngine;
     private readonly IPowerPlanService _powerPlanService;
     private readonly IDialogService _dialogService;
-    private AutomationStoreFile _store = new();
+    private bool _isCreatingRule;
+    private bool _isSaving;
+    private string _saveStatus = string.Empty;
     private AutomationRuleViewModel? _selectedRule;
+    private AutomationRuleViewModel? _editingRule;
     private string _newRuleName = "New Process Rule";
     private string _newProcessName = string.Empty;
     private string _newWindowTitleContains = string.Empty;
@@ -30,10 +30,10 @@ public sealed class AutomationsViewModel : ObservableObject
     private string? _newPowerPlanName;
     private bool _newNotificationEnabled = true;
     private bool _newRevertOnExit = true;
-    private bool _newDryRun;
+    private bool _newDryRun = true;
     private int _newCooldownSeconds = 30;
     private int _newDelaySeconds;
-    private string _presetStatus = "Safe presets are reversible, logged, and only run when their profile is active.";
+    private string _presetStatus = string.Empty;
 
     public AutomationsViewModel(
         IRulePersistenceService rulePersistenceService,
@@ -54,7 +54,16 @@ public sealed class AutomationsViewModel : ObservableObject
         UseFocusedPerformancePresetCommand = new RelayCommand(UseFocusedPerformancePreset);
         UseQuietBackgroundPresetCommand = new RelayCommand(UseQuietBackgroundPreset);
         UseFullscreenFocusPresetCommand = new RelayCommand(UseFullscreenFocusPreset);
-        AddFocusedPerformanceProfileCommand = new AsyncRelayCommand(AddFocusedPerformanceProfileAsync);
+        CreateRuleCommand = new RelayCommand(BeginNewRule);
+        EditRuleCommand = new RelayCommand(BeginEditRule, () => SelectedRule is not null);
+        BackToRulesCommand = new RelayCommand(() => IsCreatingRule = false);
+        BrowseForAppCommand = new RelayCommand(() =>
+        {
+            if (_dialogService.PickExecutable() is { } name)
+            {
+                NewProcessName = name;
+            }
+        });
         UseAllCpusAffinityCommand = new RelayCommand(() => ApplyAffinityPreset(CreateAllCpusMask()));
         UseFirstHalfAffinityCommand = new RelayCommand(() => ApplyAffinityPreset(CreateHalfCpusMask(firstHalf: true)));
         UseSecondHalfAffinityCommand = new RelayCommand(() => ApplyAffinityPreset(CreateHalfCpusMask(firstHalf: false)));
@@ -99,7 +108,33 @@ public sealed class AutomationsViewModel : ObservableObject
 
     public RelayCommand UseFullscreenFocusPresetCommand { get; }
 
-    public AsyncRelayCommand AddFocusedPerformanceProfileCommand { get; }
+    public RelayCommand CreateRuleCommand { get; }
+
+    public RelayCommand EditRuleCommand { get; }
+
+    public string EditorTitle => _editingRule is null ? "New rule" : "Edit rule";
+
+    public RelayCommand BackToRulesCommand { get; }
+
+    public RelayCommand BrowseForAppCommand { get; }
+
+    public bool IsCreatingRule
+    {
+        get => _isCreatingRule;
+        private set => SetProperty(ref _isCreatingRule, value);
+    }
+
+    public string SaveStatus
+    {
+        get => _saveStatus;
+        private set => SetProperty(ref _saveStatus, value);
+    }
+
+    public bool IsSaving
+    {
+        get => _isSaving;
+        private set => SetProperty(ref _isSaving, value);
+    }
 
     public RelayCommand UseAllCpusAffinityCommand { get; }
 
@@ -115,6 +150,7 @@ public sealed class AutomationsViewModel : ObservableObject
             if (SetProperty(ref _selectedRule, value))
             {
                 DeleteRuleCommand.RaiseCanExecuteChanged();
+                EditRuleCommand.RaiseCanExecuteChanged();
             }
         }
     }
@@ -146,6 +182,7 @@ public sealed class AutomationsViewModel : ObservableObject
             {
                 OnPropertyChanged(nameof(NewTriggerHelp));
                 OnPropertyChanged(nameof(UsesThreshold));
+                OnPropertyChanged(nameof(ThresholdLabel));
                 OnPropertyChanged(nameof(UsesWindowTitle));
             }
         }
@@ -261,6 +298,8 @@ public sealed class AutomationsViewModel : ObservableObject
 
     public bool UsesThreshold => NewTriggerType is AutomationTriggerType.CpuThreshold or AutomationTriggerType.MemoryThreshold;
 
+    public string ThresholdLabel => NewTriggerType == AutomationTriggerType.CpuThreshold ? "CPU (%)" : "Memory (MB)";
+
     public bool UsesWindowTitle => NewTriggerType is AutomationTriggerType.WindowTitleDetected or AutomationTriggerType.FullscreenDetected;
 
     public string NewPowerPlanState => NewPowerPlanEnabled ? "Enabled" : "Off";
@@ -296,12 +335,12 @@ public sealed class AutomationsViewModel : ObservableObject
 
     public async Task LoadAsync(CancellationToken cancellationToken = default)
     {
-        _store = await _rulePersistenceService.LoadAsync(cancellationToken).ConfigureAwait(false);
+        var store = await _rulePersistenceService.LoadAsync(cancellationToken).ConfigureAwait(false);
         var powerPlans = await _powerPlanService.GetAvailablePlansAsync(cancellationToken).ConfigureAwait(false);
         await UiDispatch.InvokeAsync(() =>
         {
             Rules.Clear();
-            foreach (var rule in _store.Rules.OrderBy(static rule => rule.Name))
+            foreach (var rule in store.Rules.OrderBy(static rule => rule.Name))
             {
                 Rules.Add(new AutomationRuleViewModel(rule));
             }
@@ -316,10 +355,83 @@ public sealed class AutomationsViewModel : ObservableObject
         });
     }
 
+    private void BeginNewRule()
+    {
+        _editingRule = null;
+        NewRuleName = string.Empty;
+        NewProcessName = string.Empty;
+        NewWindowTitleContains = string.Empty;
+        NewTriggerType = AutomationTriggerType.ProcessStarted;
+        NewThresholdValue = 80;
+        NewPriority = ProcessPriorityClass.AboveNormal;
+        NewAffinityEnabled = false;
+        NewAffinityMask = string.Empty;
+        NewPowerPlanEnabled = false;
+        NewPowerPlanName = GetPreferredPowerPlanName();
+        NewNotificationEnabled = true;
+        NewRevertOnExit = true;
+        NewDryRun = true;
+        NewCooldownSeconds = 30;
+        NewDelaySeconds = 0;
+        PresetStatus = string.Empty;
+        OnPropertyChanged(nameof(EditorTitle));
+        IsCreatingRule = true;
+    }
+
+    private void BeginEditRule()
+    {
+        if (SelectedRule is not { } row)
+        {
+            return;
+        }
+
+        var rule = row.Model;
+        var actions = rule.Actions.GroupBy(action => action.Type).ToDictionary(group => group.Key, group => group.ToList());
+        if (!AvailableTriggerTypes.Any(trigger => trigger.Value == rule.Trigger.Type)
+            || !actions.TryGetValue(AutomationActionType.SetProcessPriority, out var priorityActions)
+            || priorityActions[0].Priority is not { } priority
+            || !AvailablePriorities.Any(option => option.Value == priority)
+            || actions.Any(pair => pair.Value.Count != 1 || pair.Key is not (
+                AutomationActionType.SetProcessPriority or AutomationActionType.SetCpuAffinity
+                or AutomationActionType.ChangePowerPlan or AutomationActionType.SendNotification))
+            || rule.Actions.Any(action => action.Type is AutomationActionType.SetProcessPriority or AutomationActionType.SetCpuAffinity
+                && !string.Equals(action.TargetProcessName ?? string.Empty, rule.Trigger.ProcessName ?? string.Empty, StringComparison.OrdinalIgnoreCase)))
+        {
+            _dialogService.ShowWarning("Cannot edit this rule", "This rule uses actions or targets the editor cannot represent. Its settings were not changed.");
+            return;
+        }
+
+        _editingRule = row;
+        NewRuleName = rule.Name;
+        NewProcessName = rule.Trigger.ProcessName ?? string.Empty;
+        NewWindowTitleContains = rule.Trigger.WindowTitleContains ?? string.Empty;
+        NewTriggerType = rule.Trigger.Type;
+        NewThresholdValue = rule.Trigger.Threshold ?? 80;
+        NewPriority = priority;
+        var affinity = actions.GetValueOrDefault(AutomationActionType.SetCpuAffinity)?[0];
+        NewAffinityEnabled = affinity is not null;
+        NewAffinityMask = affinity is null ? string.Empty : $"0x{affinity.CpuAffinityMask:X}";
+        var plan = actions.GetValueOrDefault(AutomationActionType.ChangePowerPlan)?[0];
+        if (plan?.PowerPlanName is { } name && !AvailablePowerPlans.Contains(name))
+        {
+            AvailablePowerPlans.Add(name);
+        }
+        NewPowerPlanEnabled = plan is not null;
+        NewPowerPlanName = plan?.PowerPlanName ?? GetPreferredPowerPlanName();
+        NewNotificationEnabled = actions.ContainsKey(AutomationActionType.SendNotification);
+        NewRevertOnExit = rule.RevertOnExit;
+        NewDryRun = rule.DryRun;
+        NewCooldownSeconds = rule.CooldownSeconds;
+        NewDelaySeconds = rule.DelaySeconds;
+        PresetStatus = string.Empty;
+        OnPropertyChanged(nameof(EditorTitle));
+        IsCreatingRule = true;
+    }
+
     private void UseGameLaunchPreset()
     {
         NewRuleName = "Game Launch Boost";
-        NewProcessName = "game.exe";
+        NewProcessName = string.Empty;
         NewWindowTitleContains = string.Empty;
         NewTriggerType = AutomationTriggerType.ProcessStarted;
         NewThresholdValue = 80;
@@ -330,10 +442,10 @@ public sealed class AutomationsViewModel : ObservableObject
         NewPowerPlanName = GetPreferredPowerPlanName();
         NewNotificationEnabled = true;
         NewRevertOnExit = true;
-        NewDryRun = false;
+        NewDryRun = true;
         NewCooldownSeconds = 30;
         NewDelaySeconds = 1;
-        PresetStatus = "Game Launch Boost is ready. Replace game.exe with your game, then add and save the rule.";
+        PresetStatus = "Game Launch Boost selected";
     }
 
     private void UseFocusedPerformancePreset()
@@ -350,16 +462,16 @@ public sealed class AutomationsViewModel : ObservableObject
         NewPowerPlanName = GetPreferredPowerPlanName();
         NewNotificationEnabled = true;
         NewRevertOnExit = true;
-        NewDryRun = false;
+        NewDryRun = true;
         NewCooldownSeconds = 180;
         NewDelaySeconds = 0;
-        PresetStatus = "Safe PC Boost is ready. It gives busy apps a small, logged boost and rolls back when possible.";
+        PresetStatus = "Safe PC Boost selected";
     }
 
     private void UseQuietBackgroundPreset()
     {
         NewRuleName = "Quiet Background App";
-        NewProcessName = "discord.exe";
+        NewProcessName = string.Empty;
         NewWindowTitleContains = string.Empty;
         NewTriggerType = AutomationTriggerType.ProcessStarted;
         NewThresholdValue = 80;
@@ -369,10 +481,10 @@ public sealed class AutomationsViewModel : ObservableObject
         NewPowerPlanEnabled = false;
         NewNotificationEnabled = true;
         NewRevertOnExit = true;
-        NewDryRun = false;
+        NewDryRun = true;
         NewCooldownSeconds = 60;
         NewDelaySeconds = 0;
-        PresetStatus = "Quiet Background is ready. Replace discord.exe with an app you want to make less pushy.";
+        PresetStatus = "Quiet Background selected";
     }
 
     private void UseFullscreenFocusPreset()
@@ -392,51 +504,7 @@ public sealed class AutomationsViewModel : ObservableObject
         NewDryRun = true;
         NewCooldownSeconds = 180;
         NewDelaySeconds = 1;
-        PresetStatus = "Fullscreen Focus is staged in test mode. Turn Test only off after you trust it.";
-    }
-
-    private async Task AddFocusedPerformanceProfileAsync(CancellationToken cancellationToken)
-    {
-        var rule = _store.Rules.FirstOrDefault(static rule =>
-            rule.Name.Equals(SafePcBoostRuleName, StringComparison.OrdinalIgnoreCase)
-            || rule.Name.Equals(LegacyFocusedRuleName, StringComparison.OrdinalIgnoreCase));
-        if (rule is null)
-        {
-            rule = CreateFocusedPerformanceRule(GetPreferredPowerPlanName() ?? "High performance");
-            _store.Rules.Add(rule);
-        }
-        else if (rule.Name.Equals(LegacyFocusedRuleName, StringComparison.OrdinalIgnoreCase))
-        {
-            rule.Name = SafePcBoostRuleName;
-        }
-
-        var profile = _store.Profiles.FirstOrDefault(static profile => profile.Name.Equals(SafePcBoostProfileName, StringComparison.OrdinalIgnoreCase))
-            ?? _store.Profiles.FirstOrDefault(static profile => profile.Name.Equals(LegacyFocusedProfileName, StringComparison.OrdinalIgnoreCase));
-        if (profile is null)
-        {
-            profile = new AutomationProfile
-            {
-                Name = SafePcBoostProfileName,
-                PriorityOrder = 5,
-                Enabled = true
-            };
-            _store.Profiles.Add(profile);
-        }
-        else if (profile.Name.Equals(LegacyFocusedProfileName, StringComparison.OrdinalIgnoreCase)
-            && !_store.Profiles.Any(static item => item.Name.Equals(SafePcBoostProfileName, StringComparison.OrdinalIgnoreCase)))
-        {
-            profile.Name = SafePcBoostProfileName;
-        }
-
-        if (!profile.RuleIds.Contains(rule.Id, StringComparer.OrdinalIgnoreCase))
-        {
-            profile.RuleIds.Add(rule.Id);
-        }
-
-        await _rulePersistenceService.SaveAsync(_store, cancellationToken).ConfigureAwait(false);
-        await _automationEngine.ReloadRulesAsync(cancellationToken).ConfigureAwait(false);
-        await LoadAsync(cancellationToken).ConfigureAwait(false);
-        PresetStatus = "Safe PC Boost profile is installed. Activate it from Profiles when you want the boost armed.";
+        PresetStatus = "Fullscreen Focus selected";
     }
 
     private async Task AddRuleAsync(CancellationToken cancellationToken)
@@ -487,6 +555,14 @@ public sealed class AutomationsViewModel : ObservableObject
                 }
             ]
         };
+        var original = _editingRule;
+        if (original is not null)
+        {
+            rule.Id = original.Id;
+            rule.CreatedUtc = original.Model.CreatedUtc;
+            rule.Enabled = original.Enabled;
+            rule.Conditions = original.Model.Conditions;
+        }
 
         if (NewAffinityEnabled)
         {
@@ -521,19 +597,36 @@ public sealed class AutomationsViewModel : ObservableObject
 
         if (NewNotificationEnabled)
         {
+            var existing = original?.Model.Actions.FirstOrDefault(action => action.Type == AutomationActionType.SendNotification);
             rule.Actions.Add(new AutomationAction
             {
                 Type = AutomationActionType.SendNotification,
-                NotificationTitle = "Automation triggered",
-                NotificationMessage = string.IsNullOrWhiteSpace(processName)
+                NotificationTitle = existing?.NotificationTitle ?? "Automation triggered",
+                NotificationMessage = existing?.NotificationMessage ?? (string.IsNullOrWhiteSpace(processName)
                     ? $"{GetTriggerLabel(NewTriggerType)} matched. Priority set to {GetPriorityLabel(NewPriority)}."
-                    : $"{processName} detected. Priority set to {GetPriorityLabel(NewPriority)}."
+                    : $"{processName} detected. Priority set to {GetPriorityLabel(NewPriority)}.")
             });
         }
 
-        _store.Rules.Add(rule);
-        Rules.Add(new AutomationRuleViewModel(rule));
-        await SaveAsync(cancellationToken).ConfigureAwait(false);
+        var row = new AutomationRuleViewModel(rule);
+        var rules = original is null
+            ? Rules.Select(item => item.Model).Append(rule).ToList()
+            : Rules.Select(item => item == original ? rule : item.Model).ToList();
+        if (!await SaveRulesAsync(rules, cancellationToken))
+        {
+            return;
+        }
+
+        if (original is null)
+        {
+            Rules.Add(row);
+        }
+        else
+        {
+            Rules[Rules.IndexOf(original)] = row;
+        }
+        SelectedRule = row;
+        IsCreatingRule = false;
         NewProcessName = string.Empty;
         NewWindowTitleContains = string.Empty;
     }
@@ -612,41 +705,6 @@ public sealed class AutomationsViewModel : ObservableObject
             _ => priority.ToString()
         };
 
-    private static AutomationRule CreateFocusedPerformanceRule(string powerPlanName)
-    {
-        return new AutomationRule
-        {
-            Name = SafePcBoostRuleName,
-            Enabled = true,
-            Trigger = new AutomationTrigger
-            {
-                Type = AutomationTriggerType.CpuThreshold,
-                Threshold = 55
-            },
-            RevertOnExit = true,
-            CooldownSeconds = 180,
-            Actions =
-            [
-                new AutomationAction
-                {
-                    Type = AutomationActionType.SetProcessPriority,
-                    Priority = ProcessPriorityClass.AboveNormal
-                },
-                new AutomationAction
-                {
-                    Type = AutomationActionType.ChangePowerPlan,
-                    PowerPlanName = powerPlanName
-                },
-                new AutomationAction
-                {
-                    Type = AutomationActionType.SendNotification,
-                    NotificationTitle = "Safe PC Boost",
-                    NotificationMessage = "A high-load process was detected and given a temporary priority boost."
-                }
-            ]
-        };
-    }
-
     private async Task DeleteRuleAsync(CancellationToken cancellationToken)
     {
         if (SelectedRule is null)
@@ -660,21 +718,37 @@ public sealed class AutomationsViewModel : ObservableObject
             return;
         }
 
-        _store.Rules.RemoveAll(rule => rule.Id == selected.Id);
-        foreach (var profile in _store.Profiles)
+        if (await SaveRulesAsync(Rules.Where(rule => rule != selected).Select(rule => rule.Model).ToList(), cancellationToken))
         {
-            profile.RuleIds.Remove(selected.Id);
+            Rules.Remove(selected);
         }
-
-        await UiDispatch.InvokeAsync(() => Rules.Remove(selected));
-        SelectedRule = null;
-        await SaveAsync(cancellationToken).ConfigureAwait(false);
     }
 
     private async Task SaveAsync(CancellationToken cancellationToken)
     {
-        _store.Rules = Rules.Select(rule => rule.Model).ToList();
-        await _rulePersistenceService.SaveAsync(_store, cancellationToken).ConfigureAwait(false);
-        await _automationEngine.ReloadRulesAsync(cancellationToken).ConfigureAwait(false);
+        await SaveRulesAsync(Rules.Select(rule => rule.Model).ToList(), cancellationToken);
+    }
+
+    private async Task<bool> SaveRulesAsync(List<AutomationRule> rules, CancellationToken cancellationToken)
+    {
+        IsSaving = true;
+        try
+        {
+            SaveStatus = "Saving rules...";
+            await _rulePersistenceService.UpdateAsync(store => store.Rules = rules, cancellationToken);
+            await _automationEngine.ReloadRulesAsync(cancellationToken);
+            SaveStatus = "Rules saved";
+            return true;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or System.Text.Json.JsonException)
+        {
+            SaveStatus = "Could not save rules";
+            _dialogService.ShowWarning("Automation rules", exception.Message);
+            return false;
+        }
+        finally
+        {
+            IsSaving = false;
+        }
     }
 }
